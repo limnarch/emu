@@ -1,0 +1,1 @@
+1. due to a dirty shortcut, comparisons involving negative numbers don't work properly
