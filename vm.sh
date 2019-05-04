@@ -1,3 +1,5 @@
+#!/bin/bash
+
 path=$(dirname $0)
 
 ${path}/love.sh ${path}/vm \
