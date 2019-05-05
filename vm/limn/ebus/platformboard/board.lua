@@ -42,7 +42,6 @@ function pboard.new(vm, c, branch, intn)
 	local citronh = citron.bush
 
 	pb.serial = require("limn/ebus/platformboard/serial").new(vm, c, int, citron)
-	pb.blitter = require("limn/ebus/platformboard/blitter").new(vm, c, int, citron)
 	pb.clock = require("limn/ebus/platformboard/clock").new(vm, c, int, citron)
 	pb.ahdb = require("limn/ebus/platformboard/ahdb").new(vm, c, int, citron)
 	pb.amtsu = require("limn/ebus/platformboard/amanatsu/bus").new(vm, c, citron)
@@ -99,7 +98,6 @@ function pboard.new(vm, c, branch, intn)
 		pb.clock.reset()
 		pb.serial.reset()
 		pb.ahdb.reset()
-		pb.blitter.reset()
 		amtsu.reset()
 	end
 

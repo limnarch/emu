@@ -11,21 +11,65 @@ local palette = require("limn/ebus/kinnow2/kinnow_palette")
 
 -- slot space:
 -- 0000000-0003FFF: declROM
--- 0004000-000400F: command ports
+-- 0004000-000400F: card command ports
+-- 0004010-000401F: blitter ports
 -- 0100000-02FFFFF: possible VRAM
 
+-- == card ==
 -- port 0: commands
---  0: idle
---  1: get info
---  2: draw rectangle
---  3: enable vsync
---  4: scroll
---  5: present
---  6: window
---  7: get vsync flag + clear
+--	0: idle
+--	1: get info
+--	2: draw rectangle
+--	3: enable vsync
+--	4: scroll
+--	5: card present?
+--	6: set operation window
+--	7: get vsync flag + clear
 -- port 1: data
 -- port 2: data
 -- port 3: data
+
+-- == blitter ==
+-- port 0: commands
+--	0: idle
+--	1: blit
+-- port 1: transfer mode
+--	0: to-screen
+--    source is address
+--    dest is x,y pair (16 bits each, msb = x)
+--  1: from-screen
+--    source is x,y pair
+--    dest is address
+--  2: screen-to-screen
+--    source is x,y pair
+--    dest is x,y pair
+-- port 2: draw mode
+--  0: copy
+--    copy from source to destination
+--    valid with tmode 0,1,2
+--  1: bitcopy
+--    copy from bitmap source to destination 
+--    using d0 as background '0' color, d1 as foreground '1' color
+--    valid with tmode 0
+--  2: bitcopyt
+--    copy from bitmap source to destination, keep background intact
+--    using d1 as foreground '1' color
+--    valid with tmode 0
+--  3: mask
+--    uses a bitmap to mask off pixels
+--    using d0 as background '0' color
+--    valid with tmode 0
+--  4: copyt
+--    copy from source to destination
+--    however ignore color values of d0
+--    valid with tmode 0
+-- port 3: source
+-- port 4: destination
+-- port 5: dimension
+-- port 6: modulo (bytes to skip between rect rows from/to an address)
+-- port 7: d0
+-- port 8: d1
+
 
 function gpu.new(vm, c, page, intn)
 	local g = {}
