@@ -404,6 +404,16 @@ function gpu.new(vm, c, page, intn)
 		end
 	end
 
+	local k2lt = {
+		[0] = string.byte("k"),
+		string.byte("i"),
+		string.byte("n"),
+		string.byte("n"),
+		string.byte("o"),
+		string.byte("w"),
+		string.byte("2"),
+	}
+
 	function g.handler(s, t, offset, v)
 		if not enabled then return 0 end
 
@@ -412,6 +422,8 @@ function gpu.new(vm, c, page, intn)
 				return 0x0C007CA1
 			elseif offset == 4 then
 				return 0x4B494E57
+			elseif (offset - 8) < 7 then
+				return k2lt[offset - 8]
 			else
 				return 0
 			end
