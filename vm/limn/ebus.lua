@@ -140,12 +140,6 @@ function bus.new(vm, c)
 	]]
 
 	function b.storeByte(ptr, v)
-		if (ptr >= 0xfc9d) and (ptr < 0x10c9d) then
-			if c.cpu.reg[32] < 0xFFFE0000 then
-				error("aa!")
-			end
-		end
-
 		local m = areas[rshift(ptr, 27)]
 
 		if m ~= 0 then -- mapped
@@ -158,12 +152,6 @@ function bus.new(vm, c)
 	end
 
 	function b.storeInt(ptr, v)
-		if (ptr >= 0xfc9d) and (ptr < 0x10c9d) then
-			if c.cpu.reg[32] < 0xFFFE0000 then
-				error("aa i!")
-			end
-		end
-
 		local m = areas[rshift(ptr, 27)]
 
 		if m ~= 0 then -- mapped
@@ -178,12 +166,6 @@ function bus.new(vm, c)
 	end
 
 	function b.storeLong(ptr, v)
-		if (ptr >= 0xfc9d) and (ptr < 0x10c9d) then
-			if c.cpu.reg[32] < 0xFFFE0000 then
-				error("aa l!")
-			end
-		end
-
 		local m = areas[rshift(ptr, 27)]
 
 		if m ~= 0 then -- mapped
