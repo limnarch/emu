@@ -327,11 +327,14 @@ function gpu.new(vm, c, page, intn)
 	end
 
 	local function writePixel(color)
-		local tx = pxpipewX + pxpipewpX
-		local ty = pxpipewY + pxpipewpY
+		if color ~= pxpipewi then
+			local tx = pxpipewX + pxpipewpX
+			local ty = pxpipewY + pxpipewpY
 
-		framebuffer[ty * width + tx] = color
-		subRect(tx, ty, tx, ty)
+			framebuffer[ty * width + tx] = color
+			subRect(tx, ty, tx, ty)
+			m = true
+		end
 
 		pxpipewpX = pxpipewpX + 1
 		if pxpipewpX >= pxpipewW then
@@ -384,6 +387,8 @@ function gpu.new(vm, c, page, intn)
 				local w = rshift(port14, 16)
 				local h = band(port14, 0xFFFF)
 
+				log(string.format("kinnow3: pixelpipe read x%d y%d w%d h%d", x, y, w, h))
+
 				pxpiperX = x
 				pxpiperY = y
 				pxpiperW = w
@@ -400,6 +405,8 @@ function gpu.new(vm, c, page, intn)
 				local w = rshift(port14, 16)
 				local h = band(port14, 0xFFFF)
 
+				log(string.format("kinnow3: pixelpipe write x%d y%d w%d h%d", x, y, w, h))
+
 				pxpipewX = x
 				pxpipewY = y
 				pxpipewW = w
@@ -408,6 +415,8 @@ function gpu.new(vm, c, page, intn)
 				pxpipewpY = 0
 			elseif v == 7 then -- set pixelpipe write ignore
 				-- port13 is color
+
+				log(string.format("kinnow3: ignoring %d", port13))
 
 				pxpipewi = port13
 			elseif v == 8 then -- s2s copy
@@ -445,7 +454,7 @@ function gpu.new(vm, c, page, intn)
 			else
 				return 0
 			end
-		elseif offset < 0x4010 then -- cmd
+		elseif offset <= 0x4010 then -- cmd
 			local lo = offset - 0x4000
 			if lo == 0 then
 				return cmdh(s, t, v)
