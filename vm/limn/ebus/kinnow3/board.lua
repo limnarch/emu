@@ -7,76 +7,46 @@ local floor = math.floor
 
 local gpu = {}
 
-local palette = require("limn/ebus/kinnow2/kinnow_palette")
+local palette = require("limn/ebus/kinnow3/kinnow_palette")
 
 -- slot space:
 -- 0000000-0003FFF: declROM
--- 0004000-000400F: card command ports
--- 0004010-000401F: blitter ports
+-- 0004000-000401F: card command ports
 -- 0100000-02FFFFF: possible VRAM
 
 -- == card ==
 -- port 0: commands
 --	0: idle
 --	1: get info
---	2: draw rectangle
---	3: enable vsync
---	4: scroll
---	5: card present?
---	6: set operation window
---	7: get vsync flag + clear
+--  2: draw rectangle
+--    port 1: x,y
+--    port 2: w,h
+--    port 3: color
+--  3: scroll area vertically
+--    port 1: x,y
+--    port 2: w,h
+--    port 3: rows,backfill
+--  4: enable vsync interrupt
+--  5: set pixelpipe read region
+--    port 1: x,y
+--    port 2: w,h
+--  6: set pixelpipe write region
+--    port 1: x,y
+--    port 2: w,h 
+--  7: set pixelpipe write ignore
+--    port 1: color
 -- port 1: data
 -- port 2: data
 -- port 3: data
+-- port 4: pixelpipe
 
--- == blitter ==
--- port 0: commands
---	0: idle
---	1: blit
--- port 1: transfer mode
---	0: to-screen
---    source is address
---    dest is x,y pair (16 bits each, msb = x)
---  1: from-screen
---    source is x,y pair
---    dest is address
---  2: screen-to-screen
---    source is x,y pair
---    dest is x,y pair
--- port 2: draw mode
---  0: copy
---    copy from source to destination
---    valid with tmode 0,1,2
---  1: bitcopy
---    copy from bitmap source to destination 
---    using d0 as background '0' color, d1 as foreground '1' color
---    valid with tmode 0
---  2: bitcopyt
---    copy from bitmap source to destination, keep background intact
---    using d1 as foreground '1' color
---    valid with tmode 0
---  3: mask
---    uses a bitmap to mask off pixels
---    using d0 as background '0' color
---    valid with tmode 0
---  4: copyt
---    copy from source to destination
---    however ignore color values of d0
---    valid with tmode 0
--- port 3: source
--- port 4: destination
--- port 5: dimension
--- port 6: modulo (bytes to skip between rect rows from/to an address)
--- port 7: d0
--- port 8: d1
+-- poorly written in some spots and doesn't do some bounds checks, a badly written driver could cause the vm to segfault here
 
 
 function gpu.new(vm, c, page, intn)
 	local g = {}
 
 	local log = vm.log.log
-
-	local mmu = c.mmu
 
 	local function int()
 		c.cpu.int(intn)
@@ -103,27 +73,9 @@ function gpu.new(vm, c, page, intn)
 
 	g.vsync = false
 
-	local vsyncf = 0
-
 	local enabled = true
 
-	local windowX = 0
-	local windowY = 0
-	local windowX1 = width-1
-	local windowY1 = height-1
-	local windowW = width
-	local windowH = height
-
-	local function setWindow(x,y,w,h)
-		windowX = x
-		windowY = y
-		windowW = w
-		windowH = h
-		windowX1 = x+w-1
-		windowY1 = y+h-1
-	end
-
-	vm.registerOpt("-kinnow,display", function (arg, i)
+	vm.registerOpt("-kinnow3,display", function (arg, i)
 		local w,h = tonumber(arg[i+1]), tonumber(arg[i+2])
 
 		g.height = h
@@ -149,8 +101,6 @@ function gpu.new(vm, c, page, intn)
 
 		love.window.setMode(width, height, {["resizable"]=true})
 
-		setWindow(0,0,width,height)
-
 		if c.window then
 			c.window:setDim(width, height)
 		end
@@ -158,7 +108,7 @@ function gpu.new(vm, c, page, intn)
 		return 3
 	end)
 
-	vm.registerOpt("-kinnow,off", function (arg, i)
+	vm.registerOpt("-kinnow3,off", function (arg, i)
 		enabled = false
 
 		return 1
@@ -218,25 +168,6 @@ function gpu.new(vm, c, page, intn)
 		end
 	end
 
-	local function dirtyWindow(x,y,w,h)
-		x = (x or 0) + windowX
-		y = (y or 0) + windowY
-		w = w or windowW
-		h = h or windowH
-
-
-		subRect(x,y,x+w,y+h)
-	end
-
-	local function setWindow(x,y,w,h)
-		windowX = x
-		windowY = y
-		windowW = w
-		windowH = h
-		windowX1 = x+w
-		windowY1 = y+h
-	end
-
 	local function action(s, offset, v, d)
 		if d == 0 then -- pixel
 			if s == 0 then
@@ -281,41 +212,53 @@ function gpu.new(vm, c, page, intn)
 				subRect(bx,by,bx+3,by)
 			end
 		elseif d == 1 then -- rectangle
-			local rw = rshift(s, 16)
-			local rh = band(s, 0xFFFF)
+			local rw = rshift(offset, 16)
+			local rh = band(offset, 0xFFFF)
 
-			local rx = rshift(offset, 16)
-			local ry = band(offset, 0xFFFF)
+			local rx = rshift(s, 16)
+			local ry = band(s, 0xFFFF)
 
-			dirtyWindow(rx,ry,rw,rh)
+			local x1 = rx+rw-1
+			local y1 = ry+rh-1
 
-			local wrx,wry = rx+windowX, ry+windowY
-
-			for x = wrx, rw+wrx-1 do
-				for y = wry, rh+wry-1 do
+			for x = rx, x1 do
+				for y = ry, y1 do
 					framebuffer[y * width + x] = v
 				end
 			end
-		elseif d == 2 then -- scroll
-			dirtyWindow()
 
-			local rows = s
-			local color = offset
+			subRect(rx,ry,x1,y1)
+		elseif d == 2 then -- scroll
+			local rw = rshift(offset, 16)
+			local rh = band(offset, 0xFFFF)
+
+			local rx = rshift(s, 16)
+			local ry = band(s, 0xFFFF)
+
+			local rows = rshift(v, 16)
+			local color = band(v, 0xFFFF)
 
 			local mod = rows * width
 
-			for y = windowY, windowY1-rows do
-				for x = windowX, windowX1 do
+			local x1 = rx+rw-1
+			local y1 = ry+rh-1
+
+			for y = ry, y1-rows do
+				for x = rx, x1 do
 					local b = y * width + x
 					framebuffer[b] = framebuffer[b + mod]
 				end
 			end
 
-			for y = windowY1-rows, windowY1 do
-				for x = windowX, windowX1 do
+			for y = y1-rows, y1 do
+				for x = rx, x1 do
 					framebuffer[y * width + x] = color
 				end
 			end
+
+			subRect(rx,ry,x1,y1)
+		elseif d == 3 then -- s2s
+			-- TODO
 		end
 		m = true
 	end
@@ -346,6 +289,62 @@ function gpu.new(vm, c, page, intn)
 		end
 	end
 
+	local pxpiperX = 0
+	local pxpiperY = 0
+	local pxpiperW = 0
+	local pxpiperH = 0
+
+	local pxpiperpX = 0
+	local pxpiperpY = 0
+
+	local pxpipewX = 0
+	local pxpipewY = 0
+	local pxpipewW = 0
+	local pxpipewH = 0
+	local pxpipewi = 0xFFFFFFFF
+
+	local pxpipewpX = 0
+	local pxpipewpY = 0
+
+	local function readPixel()
+		local tx = pxpiperX + pxpiperpX
+		local ty = pxpiperY + pxpiperpY
+
+		local px = framebuffer[ty * width + tx]
+
+		pxpiperpX = pxpiperpX + 1
+		if pxpiperpX >= pxpiperW then
+			pxpiperpX = 0
+			pxpiperpY = pxpiperpY + 1
+
+			if pxpiperpY >= pxpiperH then
+				pxpiperpX = 0
+				pxpiperpY = 0
+			end
+		end
+
+		return px
+	end
+
+	local function writePixel(color)
+		local tx = pxpipewX + pxpipewpX
+		local ty = pxpipewY + pxpipewpY
+
+		framebuffer[ty * width + tx] = color
+		subRect(tx, ty, tx, ty)
+
+		pxpipewpX = pxpipewpX + 1
+		if pxpipewpX >= pxpipewW then
+			pxpipewpX = 0
+			pxpipewpY = pxpipewpY + 1
+
+			if pxpipewpY >= pxpipewH then
+				pxpipewpX = 0
+				pxpipewpY = 0
+			end
+		end
+	end
+
 	local port13 = 0
 	local port14 = 0
 	local port15 = 0
@@ -362,42 +361,61 @@ function gpu.new(vm, c, page, intn)
 				port13 = width
 				port14 = height
 			elseif v == 2 then -- rectangle
-				-- port13 is width x height, both 16-bit
-				-- port14 is x,y; both 16-bit
+				-- port13 is x,y, both 16-bit
+				-- port14 is w,h; both 16-bit
 				-- port15 is color
 
 				action(port13, port14, port15, 1)
-			elseif v == 3 then -- vsync enable
-				g.vsync = true
-			elseif v == 4 then -- scroll
-				-- port13 is rows
-				-- port14 is backfill color
+			elseif v == 3 then -- scroll vertically
+				-- port13 is x,y
+				-- port14 is w,h
+				-- port15 is rows,backfill
 
 				action(port13, port14, port15, 2)
-			elseif v == 5 then -- present
-				port13 = 1
-			elseif v == 6 then -- window
-				-- port13 is x
-				-- port14 is y
-				-- port15 is w x h, both 16-bit
+			elseif v == 4 then -- enable vsync
+				g.vsync = true
+			elseif v == 5 then -- set pixelpipe read region
+				-- port13 is x,y
+				-- port14 is w,h
 
-				local w = rshift(port15, 16)
-				local h = band(port15, 0xFFFF)
+				local x = rshift(port13, 16)
+				local y = band(port13, 0xFFFF)
 
-				local x = port13
-				local y = port14
+				local w = rshift(port14, 16)
+				local h = band(port14, 0xFFFF)
 
-				if (w == 0) or (h == 0) then
-					x = 0
-					y = 0
-					w = width
-					h = height
-				end
+				pxpiperX = x
+				pxpiperY = y
+				pxpiperW = w
+				pxpiperH = h
+				pxpiperpX = 0
+				pxpiperpY = 0
+			elseif v == 6 then -- set pixelpipe write region
+				-- port13 is x,y
+				-- port14 is w,h
 
-				setWindow(x, y, w, h)
-			elseif v == 7 then -- vsyncf
-				port13 = vsyncf
-				vsyncf = 0
+				local x = rshift(port13, 16)
+				local y = band(port13, 0xFFFF)
+
+				local w = rshift(port14, 16)
+				local h = band(port14, 0xFFFF)
+
+				pxpipewX = x
+				pxpipewY = y
+				pxpipewW = w
+				pxpipewH = h
+				pxpipewpX = 0
+				pxpipewpY = 0
+			elseif v == 7 then -- set pixelpipe write ignore
+				-- port13 is color
+
+				pxpipewi = port13
+			elseif v == 8 then -- s2s copy
+				-- port13 is x1,y1
+				-- port14 is x2,y2
+				-- port15 is w,h
+
+				action(port13, port14, port15, 3)
 			end
 		else
 			return 0
@@ -411,7 +429,7 @@ function gpu.new(vm, c, page, intn)
 		string.byte("n"),
 		string.byte("o"),
 		string.byte("w"),
-		string.byte("2"),
+		string.byte("3"),
 	}
 
 	function g.handler(s, t, offset, v)
@@ -421,7 +439,7 @@ function gpu.new(vm, c, page, intn)
 			if offset == 0 then
 				return 0x0C007CA1
 			elseif offset == 4 then
-				return 0x4B494E57
+				return 0x4B494E58
 			elseif (offset - 8) < 7 then
 				return k2lt[offset - 8]
 			else
@@ -448,6 +466,12 @@ function gpu.new(vm, c, page, intn)
 					return port15
 				else
 					port15 = v
+				end
+			elseif lo == 16 then
+				if t == 0 then
+					return readPixel()
+				else
+					writePixel(v)
 				end
 			else
 				return 0
