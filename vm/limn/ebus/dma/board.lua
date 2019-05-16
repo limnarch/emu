@@ -69,7 +69,7 @@ function dmacon.new(vm, c, branch, intn, memsize)
 	function dma.op()
 		local tsize = registers[5]
 
-		print(string.format("src %X dest %X sinc %d dinc %d count %d tmode %d", registers[0], registers[1], registers[2], registers[3], registers[4], registers[5]))
+		-- print(string.format("src %X dest %X sinc %d dinc %d count %d tmode %d", registers[0], registers[1], registers[2], registers[3], registers[4], registers[5]))
 
 		if tsize == 0 then
 			opbyte()
