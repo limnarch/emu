@@ -43,8 +43,10 @@ function pboard.new(vm, c, branch, intn)
 
 	pb.serial = require("limn/ebus/platformboard/serial").new(vm, c, int, citron)
 	pb.clock = require("limn/ebus/platformboard/clock").new(vm, c, int, citron)
-	pb.ahdb = require("limn/ebus/platformboard/ahdb").new(vm, c, int, citron)
 	pb.amtsu = require("limn/ebus/platformboard/amanatsu/bus").new(vm, c, citron)
+	pb.satsuma = require("limn/ebus/platformboard/satsuma").new(vm, c, int, citron)
+	local satsuma = pb.satsuma
+	local satsumah = satsuma.handler
 	local amtsu = pb.amtsu
 
 	-- end deeply ugly code to return to only slightly ugly code
@@ -68,7 +70,9 @@ function pboard.new(vm, c, branch, intn)
 			if t == 0 then
 				return registers[offset/4]
 			else
-				registers[offset/4] = v
+				if offset ~= 0 then
+					registers[offset/4] = v
+				end
 			end
 		elseif offset == 0x7FC then
 			return table.remove(intq, 1) or 0
@@ -86,6 +90,8 @@ function pboard.new(vm, c, branch, intn)
 			return nvramh(s, t, offset - 0x1000, v)
 		elseif (offset >= 0x800) and (offset < 0x1000) then -- info
 			return pbh(s, t, offset - 0x800, v)
+		elseif (offset >= 0x20000) and (offset < 0x21000) then -- satsuma buffer
+			return satsumah(s, t, offset - 0x20000, v)
 		else
 			c.cpu.buserror()
 			return 0
@@ -97,7 +103,7 @@ function pboard.new(vm, c, branch, intn)
 
 		pb.clock.reset()
 		pb.serial.reset()
-		pb.ahdb.reset()
+		satsuma.reset()
 		amtsu.reset()
 	end
 

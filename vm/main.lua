@@ -24,10 +24,24 @@ vm.cb.update = {}
 vm.cb.draw = {}
 vm.cb.quit = {}
 
+local timed = false
+
 function vm.registerCallback(t, cb)
 	local t = vm.cb[t]
 	if t then
 		t[#t+1] = cb
+	end
+end
+
+vm.timed = {}
+
+function vm.registerTimed(sec, handler)
+	if timed then
+		vm.timed[#vm.timed+1] = {sec, handler}
+		return vm.timed[#vm.timed]
+	else
+		handler()
+		return nil
 	end
 end
 
@@ -61,6 +75,9 @@ function love.load(arg)
 			i = i + 2
 		elseif arg[i] == "-dbg" then
 			dbmsg = true
+			i = i + 1
+		elseif arg[i] == "-asyncdev" then
+			timed = true
 			i = i + 1
 		else
 			print("unrecognized option "..arg[i])
@@ -102,6 +119,19 @@ function love.update(dt)
 	local vcl = #vct
 	for i = 1, vcl do
 		vct[i](dt)
+	end
+
+	local vtimed = vm.timed
+	local vtl = #vtimed
+	for i = 1, vtl do
+		vtimed[i][1] = vtimed[i][1] - dt
+		if vtimed[i][1] <= 0 then
+			if vtimed[i][2] then
+				vtimed[i][2]()
+			end
+
+			table.remove(vtimed, i)
+		end
 	end
 
 	local cycle = vm.computer.cpu.cycle

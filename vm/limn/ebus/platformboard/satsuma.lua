@@ -1,6 +1,6 @@
 local ahdb = {}
 
--- implements a DMA drive controller, AISA Hard Disk Bus
+-- implements the satsuma drive interface for LIMNstation
 -- supports up to 8 hot-pluggable drives
 
 -- block size is 4096 bytes
@@ -13,13 +13,11 @@ local ahdb = {}
 --		port 1A: ID 0-7
 --	2: read block 
 --		port 1A: block number
---		port 1B: 32-bit physical buffer address
 --	3: write block
 --		port 1A: block number
---		port 1B: 32-bit physical buffer address
 --	4: read new information
 --		port 1A: what happened?
---			0: DMA transfer complete
+--			0: block transfer complete
 --				details: block number
 --			1: drive attached
 --				details: drive ID
@@ -47,6 +45,48 @@ function ahdb.new(vm, c, int, bus)
 	b.drives = {}
 
 	local doint = false
+
+	local busy = 0
+	local busyw
+
+	b.buffer = ffi.new("uint8_t[4096]")
+	local buffer = b.buffer
+
+	function b.handler(s, t, offset, v)
+		if offset >= 4096 then
+			return 0
+		end
+
+		if t == 0 then
+			if s == 0 then
+				return buffer[offset]
+			elseif s == 1 then
+				local u1, u2 = buffer[offset], buffer[offset + 1]
+
+				return (u2 * 0x100) + u1
+			elseif s == 2 then
+				local u1, u2, u3, u4 = buffer[offset], buffer[offset + 1], buffer[offset + 2], buffer[offset + 3]
+
+				return (u4 * 0x1000000) + (u3 * 0x10000) + (u2 * 0x100) + u1
+			end
+		elseif t == 1 then
+			if s == 0 then
+				buffer[offset] = v
+			elseif s == 1 then
+				local u1, u2 = (math.modf(v/256))%256, v%256
+
+				buffer[offset] = u2
+				buffer[offset+1] = u1 -- little endian
+			elseif s == 2 then
+				local u1, u2, u3, u4 = (math.modf(v/16777216))%256, (math.modf(v/65536))%256, (math.modf(v/256))%256, v%256
+
+				buffer[offset] = u4
+				buffer[offset+1] = u3
+				buffer[offset+2] = u2
+				buffer[offset+3] = u1 -- little endian
+			end
+		end
+	end
 
 	function b.attach(mask) -- attach drive
 		-- find empty slot
@@ -111,8 +151,13 @@ function ahdb.new(vm, c, int, bus)
 
 	bus.addPort(0x19, function (s, t, v)
 		if t == 0 then
-			return 0
+			return busy
 		else
+			if busy ~= 0 then
+				log("guest tried to use busy satsuma controller")
+				return
+			end
+
 			if v == 1 then -- select drive
 				selected = port19
 			elseif v == 2 then -- read block
@@ -121,14 +166,12 @@ function ahdb.new(vm, c, int, bus)
 
 				local d = b.drives[selected]
 
-				-- no valid drive selected, just do nothing
-				-- this means the OS will be waiting for a DMA interrupt that will never come,
-				-- block IO will just halt and hang it
-				-- this should probably raise an error or something
-				-- haha die
-				log("reading block "..tostring(block).." to $"..string.format("%x", paddr).." from disk "..tostring(selected))
+				log("reading block "..tostring(block).." from disk "..tostring(selected))
 
+				-- no valid drive selected, bus error
 				if not d then
+					log("satsuma buserror on read")
+					c.cpu.buserror()
 					return
 				end
 
@@ -136,23 +179,32 @@ function ahdb.new(vm, c, int, bus)
 					return
 				end
 
-				local db = d.block
-				db:seek(block)
+				busy = 2
 
-				for i = 0, 4095 do
-					writeByte(paddr + i, db:read())
-				end
+				busyw = vm.registerTimed(0.0062, function ()
+					local db = d.block
+					db:seek(block)
 
-				b.info(0, block)
+					for i = 0, 4095 do
+						buffer[i] = db:read()
+					end
+
+					b.info(0, block)
+
+					busy = 0
+				end)
 			elseif v == 3 then -- write block
 				local block = port19
 				local paddr = port1A
 
 				local d = b.drives[selected]
 
-				log("writing block "..tostring(block).." from $"..string.format("%x", paddr).." to disk "..tostring(selected))
+				log("writing block "..tostring(block).." to disk "..tostring(selected))
 
+				-- no valid drive selected, bus error
 				if not d then
+					log("satsuma buserror on write")
+					c.cpu.buserror()
 					return
 				end
 
@@ -160,14 +212,20 @@ function ahdb.new(vm, c, int, bus)
 					return
 				end
 
-				local db = d.block
-				db:seek(block)
+				busy = 3
 
-				for i = 0, 4095 do
-					db:write(readByte(paddr + i))
-				end
+				busyw = vm.registerTimed(0.0062, function ()
+					local db = d.block
+					db:seek(block)
 
-				b.info(0, block)
+					for i = 0, 4095 do
+						db:write(buffer[i])
+					end
+
+					b.info(0, block)
+
+					busy = 0
+				end)
 			elseif v == 4 then -- read info
 				port19 = infowhat
 				port1A = infodetails
@@ -208,9 +266,16 @@ function ahdb.new(vm, c, int, bus)
 		port1A = 0
 		port19 = 0
 		selected = 0
+		busy = 0
+
+		if busyw then
+			busyw[1] = 0
+			busyw[2] = nil
+			busyw = nil
+		end
 	end
 
-	vm.registerOpt("-ahd", function (arg, i)
+	vm.registerOpt("-dks", function (arg, i)
 		local image = arg[i + 1]
 
 		local x,y = b.attach(true)
@@ -218,7 +283,7 @@ function ahdb.new(vm, c, int, bus)
 		if not x then
 			print("couldn't attach image "..image)
 		else
-			print(string.format("image %s on ahd%d", image, x))
+			print(string.format("image %s on dks%d", image, x))
 		end
 
 		y:image(image)
@@ -234,7 +299,7 @@ function ahdb.new(vm, c, int, bus)
 		if not x then
 			print("couldn't attach image "..image)
 		else
-			print(string.format("image %s on ahd%d", image, x))
+			print(string.format("image %s on dks%d", image, x))
 		end
 
 		y:image(image)

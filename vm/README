@@ -2,6 +2,6 @@ some terms:
 	limn - CPU
 	kinnow - 8bit framebuffer
 	ebus - primary bus
-	citron - bus
+	citron - platformboard local bus
 	anamatsu - peripheral bus
-	ahdb - aisa hard disk bus
+	satsuma - hard disk bus

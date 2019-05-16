@@ -10,7 +10,8 @@ function computer.new(vm, memsize)
 	c.mmu = require("limn/mmu").new(vm, c)
 	c.cpu = require("limn/limn1k").new(vm, c)
 
-	c.bus.insertBoard(0, "ram256", memsize)
+	c.bus.insertBoard(0, "ram256", memsize) -- virtual board for RAM
+	c.bus.insertBoard(7, "dma") -- virtual board for DMA
 
 	return c
 end
