@@ -816,6 +816,12 @@ function cpu.new(vm, c)
 
 			return pc + 1
 		end,
+		[0xF3] = function (pc) -- [] print hex in r0
+			print(string.format("%x", reg[0]))
+			io.flush()
+
+			return pc + 1
+		end,
 	}
 	local optable = p.optable
 
@@ -892,8 +898,7 @@ function cpu.new(vm, c)
 			if e then
 				reg[32] = e(pc)
 			else
-				reg[32] = pc + 1
-				print(string.format("invalid opcode at %X: %d (%s)", pc, fetchByte(pc), string.char(fetchByte(pc))))
+				--print(string.format("invalid opcode at %X: %d (%s)", pc, fetchByte(pc), string.char(fetchByte(pc))))
 				fault(1) -- invalid opcode
 			end
 		end

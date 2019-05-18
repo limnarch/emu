@@ -24,8 +24,6 @@ function serial.new(vm, c, int, bus)
 
 	local doint = false
 
-	local input = {text = ""}
-
 	local port11 = 0xFFFF
 
 	local iq = {}
@@ -33,6 +31,7 @@ function serial.new(vm, c, int, bus)
 
 	local function qchar(c)
 		iq[#iq + 1] = c
+
 		if doint then
 			int(0x2B)
 		end
