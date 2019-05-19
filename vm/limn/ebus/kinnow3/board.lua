@@ -65,6 +65,8 @@ function gpu.new(vm, c, page, intn)
 	local framebuffer = g.framebuffer
 
 	local imageData = love.image.newImageData(width, height)
+	 
+	imageData:mapPixel( function () return 0,0,0,1 end )
 
 	g.image = love.graphics.newImage(imageData)
 	local image = g.image
@@ -72,6 +74,8 @@ function gpu.new(vm, c, page, intn)
 	imageData:release()
 
 	g.vsync = false
+
+	local init = false
 
 	local enabled = true
 
@@ -501,11 +505,12 @@ function gpu.new(vm, c, page, intn)
 
 		local wc = c.window:addElement(window.canvas(c.window, function (self, x, y) 
 			if enabled then
-				love.graphics.setColor(0.3,0.0,0.1,1)
-				love.graphics.print("Framebuffer not initialized by guest.", x + 10, y + 10)
-				love.graphics.setColor(1,1,1,1)
 
 				if m then
+					if not init then
+						init = true
+					end
+
 					local uw, uh = subRectX2 - subRectX1 + 1, subRectY2 - subRectY1 + 1
 
 					if (uw == 0) or (uh == 0) then
@@ -533,6 +538,12 @@ function gpu.new(vm, c, page, intn)
 
 				love.graphics.setColor(1,1,1,1)
 				love.graphics.draw(image, x, y, 0)
+
+				if not init then
+					love.graphics.setColor(0.5,0.2,0.3,1)
+					love.graphics.print("limnvm: Framebuffer not initialized by guest.", x + 10, y + 10)
+					love.graphics.setColor(1,1,1,1)
+				end
 
 				if g.vsync then
 					int()
