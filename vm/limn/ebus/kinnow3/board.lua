@@ -33,8 +33,16 @@ local palette = require("limn/ebus/kinnow3/kinnow_palette")
 --  6: set pixelpipe write region
 --    port 1: x,y
 --    port 2: w,h 
+--    port 3: fg,bg,pattern,writetype
+--      writetypes:
+--        0: 8-bit
+--        1: 1-bit
 --  7: set pixelpipe write ignore
 --    port 1: color
+--  8: s2s copy
+--    port 1: x1,y1
+--    port 2: x2,y2
+--    port 3: w,h
 -- port 1: data
 -- port 2: data
 -- port 3: data
@@ -310,6 +318,11 @@ function gpu.new(vm, c, page, intn)
 	local pxpipewpX = 0
 	local pxpipewpY = 0
 
+	local pxpipewfg = 0
+	local pxpipewbg = 0
+	local pxpipewpattern = 0
+	local pxpipewtype = 0
+
 	local function readPixel()
 		local tx = pxpiperX + pxpiperpX
 		local ty = pxpiperY + pxpiperpY
@@ -331,16 +344,46 @@ function gpu.new(vm, c, page, intn)
 	end
 
 	local function writePixel(color)
-		if color ~= pxpipewi then
-			local tx = pxpipewX + pxpipewpX
-			local ty = pxpipewY + pxpipewpY
+		local tx = pxpipewX + pxpipewpX
+		local ty = pxpipewY + pxpipewpY
 
-			framebuffer[ty * width + tx] = color
-			subRect(tx, ty, tx, ty)
+		if pxpipewtype == 0 then
+			if color ~= pxpipewi then
+
+				framebuffer[ty * width + tx] = color
+				subRect(tx, ty, tx, ty)
+				m = true
+
+				pxpipewpX = pxpipewpX + 1
+			end
+		elseif pxpipewtype == 1 then
+			if pxpipewpattern == 0 then
+				for i = 0, 7 do
+					if band(rshift(color, i), 1) == 1 then
+						framebuffer[ty * width + tx + i] = pxpipewfg
+					else
+						framebuffer[ty * width + tx + i] = pxpipewbg
+					end
+				end
+			elseif pxpipewpattern == 1 then
+				local rc = 7
+				for i = 0, 7 do
+					if band(rshift(color, i), 1) == 1 then
+						framebuffer[ty * width + tx + rc] = pxpipewfg
+					else
+						framebuffer[ty * width + tx + rc] = pxpipewbg
+					end
+
+					rc = rc - 1
+				end
+			end
+
+			subRect(tx, ty, tx + 8, ty)
 			m = true
+
+			pxpipewpX = pxpipewpX + 8
 		end
 
-		pxpipewpX = pxpipewpX + 1
 		if pxpipewpX >= pxpipewW then
 			pxpipewpX = 0
 			pxpipewpY = pxpipewpY + 1
@@ -402,6 +445,7 @@ function gpu.new(vm, c, page, intn)
 			elseif v == 6 then -- set pixelpipe write region
 				-- port13 is x,y
 				-- port14 is w,h
+				-- port15 is fg,bg,0,writetype
 
 				local x = rshift(port13, 16)
 				local y = band(port13, 0xFFFF)
@@ -409,7 +453,12 @@ function gpu.new(vm, c, page, intn)
 				local w = rshift(port14, 16)
 				local h = band(port14, 0xFFFF)
 
-				log(string.format("kinnow3: pixelpipe write x%d y%d w%d h%d", x, y, w, h))
+				local fg = rshift(port15, 24)
+				local bg = band(rshift(port15, 16), 0xFF)
+				local pattern = band(rshift(port15, 8), 0xFF)
+				local writetype = band(port15, 0xFF)
+
+				log(string.format("kinnow3: pixelpipe write x%d y%d w%d h%d fg%d bg%d pattern%d writetype%d", x, y, w, h, fg, bg, pattern, writetype))
 
 				pxpipewX = x
 				pxpipewY = y
@@ -417,6 +466,11 @@ function gpu.new(vm, c, page, intn)
 				pxpipewH = h
 				pxpipewpX = 0
 				pxpipewpY = 0
+
+				pxpipewfg = fg
+				pxpipewbg = bg
+				pxpipewpattern = pattern
+				pxpipewtype = writetype
 			elseif v == 7 then -- set pixelpipe write ignore
 				-- port13 is color
 
