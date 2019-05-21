@@ -85,6 +85,8 @@ function bus.new(vm, c)
 	--LITTLE ENDIAN!!
 
 	function b.fetchByte(ptr)
+		ptr = band(ptr, 0xFFFFFFFF)
+
 		local m = areas[rshift(ptr, 27)]
 
 		if m ~= 0 then -- mapped
@@ -104,6 +106,8 @@ function bus.new(vm, c)
 	end
 
 	function b.fetchInt(ptr)
+		ptr = band(ptr, 0xFFFFFFFF)
+
 		local m = areas[rshift(ptr, 27)]
 
 		if m ~= 0 then -- mapped
@@ -120,6 +124,8 @@ function bus.new(vm, c)
 	end
 
 	function b.fetchLong(ptr)
+		ptr = band(ptr, 0xFFFFFFFF)
+
 		local m = areas[rshift(ptr, 27)]
 
 		if m ~= 0 then -- mapped
@@ -140,6 +146,8 @@ function bus.new(vm, c)
 	]]
 
 	function b.storeByte(ptr, v)
+		ptr = band(ptr, 0xFFFFFFFF)
+
 		local m = areas[rshift(ptr, 27)]
 
 		if m ~= 0 then -- mapped
@@ -152,6 +160,8 @@ function bus.new(vm, c)
 	end
 
 	function b.storeInt(ptr, v)
+		ptr = band(ptr, 0xFFFFFFFF)
+
 		local m = areas[rshift(ptr, 27)]
 
 		if m ~= 0 then -- mapped
@@ -166,6 +176,8 @@ function bus.new(vm, c)
 	end
 
 	function b.storeLong(ptr, v)
+		ptr = band(ptr, 0xFFFFFFFF)
+		
 		local m = areas[rshift(ptr, 27)]
 
 		if m ~= 0 then -- mapped

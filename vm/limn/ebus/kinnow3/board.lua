@@ -357,28 +357,33 @@ function gpu.new(vm, c, page, intn)
 				pxpipewpX = pxpipewpX + 1
 			end
 		elseif pxpipewtype == 1 then
+			local base = ty * width + tx
+
+			local ico = math.min(7, (pxpipewX + pxpipewW - 1) - tx) -- dont go outside of the box
+
 			if pxpipewpattern == 0 then
-				for i = 0, 7 do
+				for i = 0, ico do
 					if band(rshift(color, i), 1) == 1 then
-						framebuffer[ty * width + tx + i] = pxpipewfg
+						framebuffer[base + i] = pxpipewfg
 					else
-						framebuffer[ty * width + tx + i] = pxpipewbg
+						framebuffer[base + i] = pxpipewbg
 					end
 				end
 			elseif pxpipewpattern == 1 then
 				local rc = 7
-				for i = 0, 7 do
+
+				for i = 0, ico do
 					if band(rshift(color, i), 1) == 1 then
-						framebuffer[ty * width + tx + rc] = pxpipewfg
+						framebuffer[base + rc] = pxpipewfg
 					else
-						framebuffer[ty * width + tx + rc] = pxpipewbg
+						framebuffer[base + rc] = pxpipewbg
 					end
 
 					rc = rc - 1
 				end
 			end
 
-			subRect(tx, ty, tx + 8, ty)
+			subRect(tx, ty, tx + 7, ty)
 			m = true
 
 			pxpipewpX = pxpipewpX + 8

@@ -133,6 +133,8 @@ function cpu.new(vm, c)
 	local userMode = p.userMode
 
 	function p.psReg(n, v) -- privileged register save
+		if n > 37 then return end
+
 		if n < 32 then -- user
 			reg[n] = v
 		else -- kernel
@@ -151,6 +153,8 @@ function cpu.new(vm, c)
 	local psReg = p.psReg
 
 	function p.pgReg(n) -- privileged register fetch
+		if n > 37 then return 0 end
+
 		if n < 32 then -- user
 			return reg[n]
 		else -- kernel
