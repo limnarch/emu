@@ -500,7 +500,14 @@ function w.winterest()
 		he = math.max(he, v.h + v.y)
 	end
 
-	ows.width = wi
+	-- some hacks to keep the window centered (depends on platform's coordinates system being sane)
+	local wd = wi - ows.width
+	local hd = he - ows.height
+
+	ows.flags.x = ows.flags.x - wd/2
+	ows.flags.y = ows.flags.y - hd/2
+
+	ows.width = wi 
 	ows.height = he
 
 	love.window.setMode(ows.width, ows.height, ows.flags)
