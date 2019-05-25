@@ -8,6 +8,8 @@ local floor = math.floor
 function cpu.new(vm, c)
 	local p = {}
 
+	local log = vm.log.log
+
 	p.reg = ffi.new("uint32_t[38]")
 	local reg = p.reg
 
@@ -692,15 +694,17 @@ function cpu.new(vm, c)
 			if kernelMode() then
 				local htta = reg[36]
 
+				local nrs = 0
+
 				for i = 0, 37 do
 					if i == 34 then
-						fillState(fetchLong(htta+(34*4)))
+						nrs = fetchLong(htta+(34*4))
 					else
-						if (i ~= 36) and (i ~= 33) then
-							reg[i] = fetchLong(htta+(i*4))
-						end
+						reg[i] = fetchLong(htta+(i*4))
 					end
 				end
+
+				fillState(nrs)
 
 				return reg[32]
 			else
@@ -909,50 +913,51 @@ function cpu.new(vm, c)
 	end
 
 
+	p.regmnem = {
+		"r0",
+		"r1",
+		"r2",
+		"r3",
+		"r4",
+		"r5",
+		"r6",
+		"r7",
+		"r8",
+		"r9",
+		"r10",
+		"r11",
+		"r12",
+		"r13",
+		"r14",
+		"r15",
+		"r16",
+		"r17",
+		"r18",
+		"r19",
+		"r20",
+		"r21",
+		"r22",
+		"r23",
+		"r24",
+		"r25",
+		"r26",
+		"r27",
+		"r28",
+		"r29",
+		"r30",
+		"rf",
+
+		"pc",
+		"sp",
+		"rs",
+		"ivt",
+		"htta",
+		"usp",
+	}
 
 	-- called by vm main loop if an error occurs in cpu emulation
 	function p.vmerr(x)
-		local regmnem = {
-			"r0",
-			"r1",
-			"r2",
-			"r3",
-			"r4",
-			"r5",
-			"r6",
-			"r7",
-			"r8",
-			"r9",
-			"r10",
-			"r11",
-			"r12",
-			"r13",
-			"r14",
-			"r15",
-			"r16",
-			"r17",
-			"r18",
-			"r19",
-			"r20",
-			"r21",
-			"r22",
-			"r23",
-			"r24",
-			"r25",
-			"r26",
-			"r27",
-			"r28",
-			"r29",
-			"r30",
-			"rf",
-
-			"pc",
-			"sp",
-			"rs",
-			"ivt",
-			"htta",
-			"usp",
-		}
+		local regmnem = p.regmnem
 
 		local es = string.format("=== internal CPU emulation error! ===\n%s\n", x)
 
@@ -977,6 +982,23 @@ function cpu.new(vm, c)
 
 		reg[32] = reg[32] + 1
 	end
+
+
+
+
+	-- UI stuff
+
+	p.window = window.new("CPU Info", 8*32, 394)
+
+	local function draw(_, dx, dy)
+		for i = 0, 37 do
+			love.graphics.print(string.format("%s = $%X", p.regmnem[i+1], reg[i]), dx, dy + (i*8))
+		end
+	end
+
+	local wc = p.window:addElement(window.canvas(p.window, draw, 8*32, 384))
+	wc.x = 0
+	wc.y = 20
 
 	return p
 end

@@ -6,6 +6,8 @@ local lshift, rshift, tohex, arshift, band, bxor, bor, bnot, bror, brol =
 function mmu.new(vm, c)
 	local m = {}
 
+	local log = vm.log.log
+
 	local mmu = m
 
 	m.translating = false
@@ -80,6 +82,8 @@ function mmu.new(vm, c)
 		if t == 0 then
 			return registers[offset/4]
 		else
+			log(string.format("mmu register[%d]=0x%X",offset/4,v))
+
 			registers[offset/4] = v
 		end
 	end)
@@ -93,6 +97,7 @@ function mmu.new(vm, c)
 		if bptr >= registers[2] then
 			registers[4] = bptr
 			c.cpu.pagefault()
+			return 0
 		end
 
 		return TfetchByte(bptr)
@@ -106,6 +111,7 @@ function mmu.new(vm, c)
 		if bptr+1 >= registers[2] then
 			registers[4] = bptr
 			c.cpu.pagefault()
+			return 0
 		end
 
 		return TfetchInt(bptr)
@@ -119,6 +125,7 @@ function mmu.new(vm, c)
 		if bptr+3 >= registers[2] then
 			registers[4] = bptr
 			c.cpu.pagefault()
+			return 0
 		end
 
 		return TfetchLong(bptr)
@@ -133,6 +140,7 @@ function mmu.new(vm, c)
 		if bptr >= registers[2] then
 			registers[4] = bptr
 			c.cpu.pagefault()
+			return 0
 		end
 
 		return TstoreByte(bptr, v)
@@ -146,6 +154,7 @@ function mmu.new(vm, c)
 		if bptr+1 >= registers[2] then
 			registers[4] = bptr
 			c.cpu.pagefault()
+			return 0
 		end
 
 		return TstoreInt(bptr, v)
@@ -159,6 +168,7 @@ function mmu.new(vm, c)
 		if bptr+3 >= registers[2] then
 			registers[4] = bptr
 			c.cpu.pagefault()
+			return 0
 		end
 
 		return TstoreLong(bptr, v)
