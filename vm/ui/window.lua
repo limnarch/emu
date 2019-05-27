@@ -10,6 +10,8 @@ w.mselect = nil
 w.oselect = nil
 w.miselect = nil
 
+w.fs = nil
+
 w.wopen = {}
 
 function w.renderText(text, x, y, w, h, r, g, b, a)
@@ -197,8 +199,8 @@ function w.open(window, x, y)
 		w.close(window)
 	end
 
-	window.x = x or 50
-	window.y = y or 50
+	window.x = x or (window.x or 50)
+	window.y = y or (window.y or 50)
 
 	window.iopen = #w.wopen + 1
 	w.wopen[#w.wopen + 1] = window
@@ -489,6 +491,12 @@ function w.drawElement(e, x, y)
 	end
 end
 
+function w.fullscreen(window)
+	w.fs = window
+	window.x = 0
+	window.y = -20
+end
+
 function w.winterest()
 	local ows = {}
 	ows.width, ows.height, ows.flags = love.window.getMode()
@@ -509,6 +517,8 @@ function w.winterest()
 
 	ows.width = wi 
 	ows.height = he
+
+	-- ows.flags.borderless = true
 
 	love.window.setMode(ows.width, ows.height, ows.flags)
 end
@@ -656,6 +666,16 @@ function w.filedropped(file)
 end
 
 function w.textinput(text)
+	if w.fs then
+		local o = w.fs
+
+		if o.textinput then
+			o:textinput(key, t)
+		end
+
+		return
+	end
+
 	if w.kbselect then
 		local v = w.kbselect
 
@@ -670,6 +690,16 @@ function w.keypressed(key, t)
 		w.mouseUncapture()
 	end
 
+	if w.fs then
+		local o = w.fs
+
+		if o.keypressed then
+			o:keypressed(key, t)
+		end
+
+		return
+	end
+
 	if w.kbselect then
 		local v = w.kbselect
 
@@ -680,6 +710,16 @@ function w.keypressed(key, t)
 end
 
 function w.keyreleased(key, t)
+	if w.fs then
+		local o = w.fs
+
+		if o.keyreleased then
+			o:keyreleased(key, t)
+		end
+
+		return
+	end
+
 	if w.kbselect then
 		local v = w.kbselect
 

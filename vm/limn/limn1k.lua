@@ -392,7 +392,7 @@ function cpu.new(vm, c)
 			return pc + 5, true
 		end,
 		[0x22] = function (pc) -- [ble]
-			if (getFlag(0) == 1) or (getFlag(1) == 0) then
+			if (getFlag(1) == 0) then
 				return fetchLong(pc + 1), true
 			end
 
@@ -988,17 +988,19 @@ function cpu.new(vm, c)
 
 	-- UI stuff
 
-	p.window = window.new("CPU Info", 8*32, 394)
+	if vm.window then
+		p.window = vm.window.new("CPU Info", 8*32, 394)
 
-	local function draw(_, dx, dy)
-		for i = 0, 37 do
-			love.graphics.print(string.format("%s = $%X", p.regmnem[i+1], reg[i]), dx, dy + (i*8))
+		local function draw(_, dx, dy)
+			for i = 0, 37 do
+				love.graphics.print(string.format("%s = $%X", p.regmnem[i+1], reg[i]), dx, dy + (i*8))
+			end
 		end
-	end
 
-	local wc = p.window:addElement(window.canvas(p.window, draw, 8*32, 384))
-	wc.x = 0
-	wc.y = 20
+		local wc = p.window:addElement(window.canvas(p.window, draw, 8*32, 384))
+		wc.x = 0
+		wc.y = 20
+	end
 
 	return p
 end

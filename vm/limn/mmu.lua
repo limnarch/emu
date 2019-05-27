@@ -61,32 +61,10 @@ function mmu.new(vm, c)
 	0: reserved
 	1: base
 	2: bounds
-	3: page table
+	3: reserved
 	4: faulting address
 
 	]]
-
-	bus.mapArea(23, function (s, t, offset, v)
-		if offset > 128 then
-			return 0
-		end
-
-		if band(offset, 3) ~= 0 then -- must be aligned to 4 bytes
-			return 0
-		end
-
-		if s ~= 2 then -- must be a 32-bit access
-			return 0
-		end
-
-		if t == 0 then
-			return registers[offset/4]
-		else
-			log(string.format("mmu register[%d]=0x%X",offset/4,v))
-
-			registers[offset/4] = v
-		end
-	end)
 
 	--this is where paging translation etc will go
 
@@ -95,7 +73,7 @@ function mmu.new(vm, c)
 
 		local bptr = ptr + registers[1]
 		if bptr >= registers[2] then
-			registers[4] = bptr
+			registers[4] = ptr
 			c.cpu.pagefault()
 			return 0
 		end
@@ -109,7 +87,7 @@ function mmu.new(vm, c)
 
 		local bptr = ptr + registers[1]
 		if bptr+1 >= registers[2] then
-			registers[4] = bptr
+			registers[4] = ptr
 			c.cpu.pagefault()
 			return 0
 		end
@@ -119,11 +97,20 @@ function mmu.new(vm, c)
 	local fetchInt = m.fetchInt
 
 	function m.fetchLong(ptr)
-		if not m.translating then return TfetchLong(ptr) end
+		if not m.translating then
+			if (ptr >= 0xB8000000) and (ptr < 0xB8000020) then
+				local optr = ptr - 0xB8000000
+				if band(optr, 3) == 0 then
+					return registers[optr / 4]
+				end
+			end
+
+			return TfetchLong(ptr)
+		end
 
 		local bptr = ptr + registers[1]
 		if bptr+3 >= registers[2] then
-			registers[4] = bptr
+			registers[4] = ptr
 			c.cpu.pagefault()
 			return 0
 		end
@@ -138,7 +125,7 @@ function mmu.new(vm, c)
 
 		local bptr = ptr + registers[1]
 		if bptr >= registers[2] then
-			registers[4] = bptr
+			registers[4] = ptr
 			c.cpu.pagefault()
 			return 0
 		end
@@ -152,7 +139,7 @@ function mmu.new(vm, c)
 
 		local bptr = ptr + registers[1]
 		if bptr+1 >= registers[2] then
-			registers[4] = bptr
+			registers[4] = ptr
 			c.cpu.pagefault()
 			return 0
 		end
@@ -162,11 +149,21 @@ function mmu.new(vm, c)
 	local storeInt = m.storeInt
 
 	function m.storeLong(ptr, v)
-		if not m.translating then return TstoreLong(ptr, v) end
+		if not m.translating then
+			if (ptr >= 0xB8000000) and (ptr < 0xB8000020) then
+				local optr = ptr - 0xB8000000
+				if band(optr, 3) == 0 then
+					registers[optr / 4] = v
+				end
+				return 0
+			end
+
+			return TstoreLong(ptr, v)
+		end
 
 		local bptr = ptr + registers[1]
 		if bptr+3 >= registers[2] then
-			registers[4] = bptr
+			registers[4] = ptr
 			c.cpu.pagefault()
 			return 0
 		end

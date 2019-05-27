@@ -353,9 +353,9 @@ function gpu.new(vm, c, page, intn)
 				framebuffer[ty * width + tx] = color
 				subRect(tx, ty, tx, ty)
 				m = true
-
-				pxpipewpX = pxpipewpX + 1
 			end
+
+			pxpipewpX = pxpipewpX + 1
 		elseif pxpipewtype == 1 then
 			local base = ty * width + tx
 
@@ -370,23 +370,23 @@ function gpu.new(vm, c, page, intn)
 					end
 				end
 			elseif pxpipewpattern == 1 then
-				local rc = 7
+				local bm = ico
 
 				for i = 0, ico do
-					if band(rshift(color, i), 1) == 1 then
-						framebuffer[base + rc] = pxpipewfg
+					if band(rshift(color, bm), 1) == 1 then
+						framebuffer[base + i] = pxpipewfg
 					else
-						framebuffer[base + rc] = pxpipewbg
+						framebuffer[base + i] = pxpipewbg
 					end
 
-					rc = rc - 1
+					bm = bm - 1
 				end
 			end
 
-			subRect(tx, ty, tx + 7, ty)
+			subRect(tx, ty, tx + ico, ty)
 			m = true
 
-			pxpipewpX = pxpipewpX + 8
+			pxpipewpX = pxpipewpX + ico + 1
 		end
 
 		if pxpipewpX >= pxpipewW then
@@ -548,7 +548,7 @@ function gpu.new(vm, c, page, intn)
 			else
 				return 0
 			end
-		elseif (offset >= 0x100000) and (offset < (0x100000 + fbs)) then
+		elseif (offset >= 0x100000) and (offset < (0x100000 + fbs - 1)) then
 			return gpuh(s, t, offset-0x100000, v)
 		else
 			return 0
@@ -614,6 +614,28 @@ function gpu.new(vm, c, page, intn)
 
 		wc.x = 0
 		wc.y = 20
+
+		local fbdwindow = vm.window.new("!! SCREENSHOT !!", 100, 100)
+
+		function fbdwindow:opened()
+			-- take a SCREENSHOT
+
+			self:close()
+
+			local tid = love.image.newImageData(width, height)
+
+			for x = 0, width-1 do
+				for y = 0, height-1 do
+					local color = palette[framebuffer[y * width + x]]
+
+					tid:setPixel(x, y, color.r/255, color.g/255, color.b/255, 1)
+				end
+			end
+
+			local fd = tid:encode("png", "KINNOW3.png")
+
+			tid:release()
+		end
 	end
 
 

@@ -13,6 +13,8 @@ window = require("ui/window")
 
 local vm = {}
 
+vm.window = window
+
 vm.speed = 1
 
 vm.hz = 5000000
@@ -79,6 +81,9 @@ function love.load(arg)
 		elseif arg[i] == "-asyncdev" then
 			timed = true
 			i = i + 1
+		elseif arg[i] == "-fbfs" then
+			window.fullscreen(vm.computer.window)
+			i = i + 1
 		else
 			print("unrecognized option "..arg[i])
 			i = i + 1
@@ -90,7 +95,7 @@ function love.load(arg)
 	love.keyboard.setKeyRepeat(true)
 
 	if vm.computer.window then
-		vm.computer.window:open(0,0)
+		vm.computer.window:open()
 
 		if not vm.computer.window.gc then
 			vm.computer.window:shutter()
