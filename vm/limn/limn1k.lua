@@ -800,6 +800,42 @@ function cpu.new(vm, c)
 			return pc + 3
 		end,
 
+		[0x52] = function (pc) -- [cmps]
+			local o1, o2 = lsign(pgReg(fetchByte(pc + 1))), lsign(pgReg(fetchByte(pc + 2)))
+
+			if o1 > o2 then
+				setFlag(1, 1)
+			else
+				setFlag(1, 0)
+			end
+
+			if o1 == o2 then
+				setFlag(0, 1)
+			else
+				setFlag(0, 0)
+			end
+
+			return pc + 3
+		end,
+
+		[0x53] = function (pc) -- [cmpsi]
+			local o1, o2 = lsign(pgReg(fetchByte(pc + 1))), lsign(fetchLong(pc + 2))
+
+			if o1 > o2 then
+				setFlag(1, 1)
+			else
+				setFlag(1, 0)
+			end
+
+			if o1 == o2 then
+				setFlag(0, 1)
+			else
+				setFlag(0, 0)
+			end
+
+			return pc + 6
+		end,
+
 		-- temporary for vm debug purposes
 
 		[0xF0] = function (pc) -- [] dump all registers to terminal

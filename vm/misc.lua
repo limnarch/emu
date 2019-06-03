@@ -24,44 +24,10 @@ function getBit(v,n) -- get bit n from v
 end
 
 
-function bsign(v)
-	if band(v, 128) == 128 then -- negative
-		return -band(v, 127)
-	else
-		return v
-	end
-end
-
-function isign(v)
-	if band(v, 32768) == 32768 then -- negative
-		return -band(v, 32767)
-	else
-		return v
-	end
-end
-
 function lsign(v)
-	if band(v, 2147483648) == 2147483648 then -- negative
-		return -band(v, 2147483647)
+	if getBit(v, 31) == 1 then
+		return -(bnot(v)+1)
 	else
 		return v
-	end
-end
-
-function busign(v)
-	if v < 0 then
-		v = bor(math.abs(v), 128)
-	end
-end
-
-function iusign(v)
-	if v < 0 then
-		v = bor(math.abs(v), 32768)
-	end
-end
-
-function lusign(v)
-	if v < 0 then
-		v = bor(math.abs(v), 2147483648)
 	end
 end
