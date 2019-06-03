@@ -10,7 +10,7 @@ function cpu.new(vm, c)
 
 	local log = vm.log.log
 
-	p.reg = ffi.new("uint32_t[38]")
+	p.reg = ffi.new("uint32_t[42]")
 	local reg = p.reg
 
 	p.intq = {}
@@ -135,7 +135,7 @@ function cpu.new(vm, c)
 	local userMode = p.userMode
 
 	function p.psReg(n, v) -- privileged register save
-		if n > 37 then return end
+		if n > 41 then return end
 
 		if n < 32 then -- user
 			reg[n] = v
@@ -155,7 +155,7 @@ function cpu.new(vm, c)
 	local psReg = p.psReg
 
 	function p.pgReg(n) -- privileged register fetch
-		if n > 37 then return 0 end
+		if n > 41 then return 0 end
 
 		if n < 32 then -- user
 			return reg[n]
@@ -706,6 +706,8 @@ function cpu.new(vm, c)
 
 				fillState(nrs)
 
+				reg[36] = htta + 38*4
+
 				return reg[32]
 			else
 				fault(3)
@@ -716,6 +718,7 @@ function cpu.new(vm, c)
 
 		[0x4B] = function (pc) -- [htts]
 			if kernelMode() then
+				reg[36] = reg[36] - 38*4
 				local htta = reg[36]
 
 				local nrs = pop()
@@ -953,6 +956,11 @@ function cpu.new(vm, c)
 		"ivt",
 		"htta",
 		"usp",
+
+		"k0",
+		"k1",
+		"k2",
+		"k3",
 	}
 
 	-- called by vm main loop if an error occurs in cpu emulation

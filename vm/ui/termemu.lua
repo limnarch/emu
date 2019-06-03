@@ -9,16 +9,44 @@ s.swindow = window.new("Terminal", 648, 394)
 
 s.font = love.graphics.newFont("ui/3270Medium.ttf", 16)
 
+local ctrlkeys = {
+	["2"] = 0,
+	["a"] = 1, ["b"] = 2, ["c"] = 3,
+	["d"] = 4, ["e"] = 5, ["f"] = 6,
+	["g"] = 7, ["h"] = 8, ["i"] = 9,
+	["j"] = 10, ["k"] = 11, ["l"] = 12,
+	["m"] = 13, ["n"] = 14, ["o"] = 15,
+	["p"] = 16, ["q"] = 17, ["r"] = 18,
+	["s"] = 19, ["t"] = 20, ["u"] = 21,
+	["v"] = 22, ["w"] = 23, ["x"] = 24,
+	["y"] = 25, ["z"] = 26,
+	["["] = 27,
+	["\\"] = 28,
+	["]"] = 29,
+	["6"] = 30,
+	["-"] = 31,
+}
+
 function s.swindow:keypressed(key, t)
-	if key == "return" then
-		s.stream(string.char(0xA))
-	elseif key == "backspace" then
-		s.stream(string.char(8))
+	if love.keyboard.isDown("lctrl") then
+		local e = ctrlkeys[t]
+
+		if e then
+			s.stream(string.char(e))
+		end
+	else
+		if key == "return" then
+			s.stream(string.char(0xA))
+		elseif key == "backspace" then
+			s.stream(string.char(8))
+		end
 	end
 end
 
 function s.swindow:textinput(text)
-	s.stream(text)
+	if not love.keyboard.isDown("lctrl") then
+		s.stream(text)
+	end
 end
 
 s.canvas = love.graphics.newCanvas(640,384)
@@ -112,7 +140,13 @@ function s.putc(c)
 		nl()
 	elseif c == string.char(0x8) then
 		s.x = s.x - 1
-		if s.x < 0 then s.x = 0 end
+		if s.x < 0 then
+			s.x = 79
+			s.y = s.y - 1
+			if s.y < 0 then
+				s.y = 0
+			end
+		end
 	elseif c == string.char(0x1B) then
 		s.escape = true
 	elseif c == "\t" then
