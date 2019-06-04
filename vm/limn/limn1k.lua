@@ -1036,7 +1036,7 @@ function cpu.new(vm, c)
 		p.window = vm.window.new("CPU Info", 8*32, 394)
 
 		local function draw(_, dx, dy)
-			for i = 0, 37 do
+			for i = 0, 41 do
 				love.graphics.print(string.format("%s = $%X", p.regmnem[i+1], reg[i]), dx, dy + (i*8))
 			end
 		end
