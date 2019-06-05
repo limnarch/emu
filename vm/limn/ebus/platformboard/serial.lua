@@ -67,7 +67,13 @@ function serial.new(vm, c, int, bus)
 		if t == 1 then
 			port11 = v
 		else
-			return port11
+			if s == 0 then
+				return band(port11, 0xFF)
+			elseif s == 1 then
+				return band(port11, 0xFFFF)
+			else
+				return port11
+			end
 		end
 	end)
 
