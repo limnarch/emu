@@ -644,7 +644,7 @@ function cpu.new(vm, c)
 			return pc + 1
 		end,
 		[0x46] = function (pc) -- [brk]
-			int(0x10)
+			fault(0x5)
 
 			return pc + 1
 		end,
@@ -1036,14 +1036,26 @@ function cpu.new(vm, c)
 		p.window = vm.window.new("CPU Info", 8*32, 394)
 
 		local function draw(_, dx, dy)
-			for i = 0, 41 do
-				love.graphics.print(string.format("%s = $%X", p.regmnem[i+1], reg[i]), dx, dy + (i*8))
+			for i = 0, 42 do
+				if i < 42 then
+					love.graphics.print(string.format("%s = $%X", p.regmnem[i+1], reg[i]), dx, dy + (i*8))
+				else
+					love.graphics.print(string.format("queue depth = %d", #intq), dx, dy + (i*8))
+				end
 			end
 		end
 
 		local wc = p.window:addElement(window.canvas(p.window, draw, 8*32, 384))
 		wc.x = 0
 		wc.y = 20
+
+		function p.window:keypressed(key, t)
+			if key == "return" then
+				running = not running
+			elseif key == "escape" then
+				fault(0x5)
+			end
+		end
 	end
 
 	return p

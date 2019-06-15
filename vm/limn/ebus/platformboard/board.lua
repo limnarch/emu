@@ -75,7 +75,11 @@ function pboard.new(vm, c, branch, intn)
 				end
 			end
 		elseif offset == 0x7FC then
-			return table.remove(intq, 1) or 0
+			if t == 0 then
+				return table.remove(intq, 1) or 0xFFFFFFFF
+			else
+				intq = {}
+			end
 		else
 			return 0
 		end

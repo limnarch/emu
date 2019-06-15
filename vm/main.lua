@@ -112,14 +112,6 @@ local ct = 0
 function love.update(dt)
 	ct = ct + dt
 
-	if dbmsg then
-		if ct > 1 then
-			print(string.format("%d hz", cycles))
-			ct = 0
-			cycles = 0
-		end
-	end
-
 	local vct = vm.cb.update
 	local vcl = #vct
 	for i = 1, vcl do
