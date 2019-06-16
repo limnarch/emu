@@ -366,7 +366,9 @@ function gpu.new(vm, c, page, intn)
 					if band(rshift(color, i), 1) == 1 then
 						framebuffer[base + i] = pxpipewfg
 					else
-						framebuffer[base + i] = pxpipewbg
+						if pxpipewbg ~= 0xFF then
+							framebuffer[base + i] = pxpipewbg
+						end
 					end
 				end
 			elseif pxpipewpattern == 1 then
@@ -376,7 +378,9 @@ function gpu.new(vm, c, page, intn)
 					if band(rshift(color, bm), 1) == 1 then
 						framebuffer[base + i] = pxpipewfg
 					else
-						framebuffer[base + i] = pxpipewbg
+						if pxpipewbg ~= 0xFF then
+							framebuffer[base + i] = pxpipewbg
+						end
 					end
 
 					bm = bm - 1

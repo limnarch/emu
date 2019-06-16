@@ -177,6 +177,7 @@ function cpu.new(vm, c)
 
 		reg[32] = resetVector
 	end
+	local reset = p.reset
 
 	-- push long to stack
 	function p.push(v)
@@ -1054,6 +1055,8 @@ function cpu.new(vm, c)
 				running = not running
 			elseif key == "escape" then
 				fault(0x5)
+			elseif key == "r" then
+				reset()
 			end
 		end
 	end
