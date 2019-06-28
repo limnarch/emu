@@ -14,6 +14,8 @@ w.fs = nil
 
 w.wopen = {}
 
+local margin = 20
+
 function w.renderText(text, x, y, w, h, r, g, b, a)
 	local sx = x
 
@@ -501,7 +503,9 @@ function w.winterest()
 	local ows = {}
 	ows.width, ows.height, ows.flags = love.window.getMode()
 
-	local wi,he = 0,0
+	local wi,he = margin * 2, margin * 2
+
+	local wl = #w.wopen
 
 	for k,v in ipairs(w.wopen) do
 		wi = math.max(wi, v.w + v.x)

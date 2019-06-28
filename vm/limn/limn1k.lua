@@ -458,12 +458,12 @@ function cpu.new(vm, c)
 			return pc + 7
 		end,
 		[0x29] = function (pc) -- [sub]
-			psReg(fetchByte(pc + 1), math.abs(pgReg(fetchByte(pc + 2)) - pgReg(fetchByte(pc + 3))))
+			psReg(fetchByte(pc + 1), pgReg(fetchByte(pc + 2)) - pgReg(fetchByte(pc + 3)))
 
 			return pc + 4
 		end,
 		[0x2A] = function (pc) -- [subi]
-			psReg(fetchByte(pc + 1), math.abs(pgReg(fetchByte(pc + 2)) - fetchLong(pc + 3)))
+			psReg(fetchByte(pc + 1), pgReg(fetchByte(pc + 2)) - fetchLong(pc + 3))
 
 			return pc + 7
 		end,

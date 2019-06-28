@@ -130,7 +130,7 @@ function serial.new(vm, c, int, bus)
 	s.termemu.swindow.name = "Serial Terminal"
 
 	vm.registerOpt("-serial,wopen", function (arg, i)
-		s.termemu.swindow:open(0, 20)
+		s.termemu.swindow:open(0, 0)
 
 		return 1
 	end)

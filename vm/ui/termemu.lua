@@ -1,13 +1,17 @@
 local s = {}
 
-local moonshine = require("ui/moonshine")
+local fw = 8
+local fh = 18
 
-s.effect = moonshine(648, 394, moonshine.effects.crt)
-s.effect.crt.distortionFactor = {1.025, 1.032}
+local m = 8
+local m2 = m * 2
 
-s.swindow = window.new("Terminal", 648, 394)
+local cw = 80
+local ch = 24
 
-s.font = love.graphics.newFont("ui/3270Medium.ttf", 16)
+s.swindow = window.new("Terminal", cw * fw + m2, ch * fh + m2)
+
+s.font = love.graphics.newFont("ui/VT323-Regular.ttf", fh)
 
 local ctrlkeys = {
 	["2"] = 0,
@@ -49,13 +53,13 @@ function s.swindow:textinput(text)
 	end
 end
 
-s.canvas = love.graphics.newCanvas(640,384)
-s.bcanvas = love.graphics.newCanvas(640,384)
+s.canvas = love.graphics.newCanvas(fw * cw, fh * ch)
+s.bcanvas = love.graphics.newCanvas(fw * cw, fh * ch)
 
 s.x = 0
 s.y = 0
 
-s.bgc = {0x2D/0xFF, 0x3D/0xFF, 0x6E/0xFF}
+s.bgc = {0x00/0xFF, 0x00/0xFF, 0x00/0xFF}
 s.fgc = {0xFF/0xFF, 0xFF/0xFF, 0xFF/0xFF}
 
 s.escape = false
@@ -64,7 +68,7 @@ local function scroll()
 	love.graphics.setCanvas(s.bcanvas)
 	love.graphics.setColor(1, 1, 1, 1)
 	love.graphics.clear(s.bgc[1], s.bgc[2], s.bgc[3], 1)
-	love.graphics.draw(s.canvas, 0, -16)
+	love.graphics.draw(s.canvas, 0, -fh)
 	love.graphics.setCanvas()
 
 	local oldc = s.canvas
@@ -86,7 +90,7 @@ end
 local function clear()
 	love.graphics.setCanvas(s.canvas)
 	love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
-	love.graphics.rectangle("fill", 0, 0, 640, 384)
+	love.graphics.rectangle("fill", 0, 0, fw * cw, fh * ch)
 	love.graphics.setCanvas()
 	s.x = 0
 	s.y = 0
@@ -104,12 +108,12 @@ function s.drawc(c)
 	love.graphics.setCanvas(s.canvas)
 
 	love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
-	love.graphics.rectangle("fill", s.x*8,s.y*16, 8, 16)
+	love.graphics.rectangle("fill", s.x*fw,s.y*fh, fw, fh)
 
 	love.graphics.setColor(s.fgc[1], s.fgc[2], s.fgc[3], 1)
 	local of = love.graphics.getFont()
 	love.graphics.setFont(s.font)
-	love.graphics.print(c,s.x*8,s.y*16)
+	love.graphics.print(c,s.x*fw,s.y*fh)
 	love.graphics.setFont(of)
 	love.graphics.setCanvas()
 end
@@ -141,7 +145,7 @@ function s.putc(c)
 	elseif c == string.char(0x8) then
 		s.x = s.x - 1
 		if s.x < 0 then
-			s.x = 79
+			s.x = cw - 1
 			s.y = s.y - 1
 			if s.y < 0 then
 				s.y = 0
@@ -152,31 +156,29 @@ function s.putc(c)
 	elseif c == "\t" then
 		s.x = (math.floor(s.x / 8) + 1) * 8
 
-		if s.x >= 80 then
+		if s.x >= cw then
 			nl()
 		end
 	else
 		s.drawc(c)
 
 		s.x = s.x + 1
-		if s.x == 80 then
+		if s.x == cw then
 			nl()
 		end
 	end
 end
 
 local function draw(_, dx, dy)
-	s.effect(function ()
-		love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
-		love.graphics.rectangle("fill", 0, 0, 648, 404)
+	love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
+	love.graphics.rectangle("fill", dx, dy, fw * cw + m2, fh * ch + m2)
 
-		love.graphics.setColor(0xFF/0xFF, 0xFF/0xFF, 0xFF/0xFF, 1)
-		love.graphics.draw(s.canvas, 4, 4)
-		love.graphics.rectangle("fill", s.x*8 + 4, s.y*16 + 4, 8, 16)
-	end, dx, dy)
+	love.graphics.setColor(0xFF/0xFF, 0xFF/0xFF, 0xFF/0xFF, 1)
+	love.graphics.draw(s.canvas, dx+m, dy+m)
+	love.graphics.rectangle("fill", s.x*fw + dx + m, s.y*fh + dy + m, fw, fh)
 end
 
-local wc = s.swindow:addElement(window.canvas(s.swindow, draw, 640, 384))
+local wc = s.swindow:addElement(window.canvas(s.swindow, draw, cw * fw, ch * fh))
 wc.x = 0
 wc.y = 20
 

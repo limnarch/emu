@@ -95,11 +95,8 @@ function love.load(arg)
 	love.keyboard.setKeyRepeat(true)
 
 	if vm.computer.window then
-		vm.computer.window:open()
-
-		if not vm.computer.window.gc then
-			vm.computer.window:shutter()
-			window.unselectany(vm.computer.window)
+		if vm.computer.window.gc then
+			vm.computer.window:open()
 		end
 	end
 
