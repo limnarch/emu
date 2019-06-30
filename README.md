@@ -8,9 +8,9 @@ The virtual machine's user interface is a simple windowed experience. You can op
 
 The long-term goal is to create a really neat (but useless) emulated desktop computer.
 
-Ships with a pre-built boot ROM binary.
+Ships with a pre-built [boot ROM](https://github.com/limnarch/a3x) binary.
 
-![Running the Antecedent 3.x boot firmware](https://i.imgur.com/eV6MF9h.png)
+![Running the Antecedent 3.x boot firmware](https://i.imgur.com/mIK4Pmd.png)
 
 ## Running
 
