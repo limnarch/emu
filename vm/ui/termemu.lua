@@ -3,7 +3,7 @@ local s = {}
 local fw = 8
 local fh = 18
 
-local m = 8
+local m = fw*8
 local m2 = m * 2
 
 local cw = 80

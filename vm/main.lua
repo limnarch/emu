@@ -109,6 +109,12 @@ local ct = 0
 function love.update(dt)
 	ct = ct + dt
 
+	if (ct > 1) and (dbmsg) then
+		print(cycles)
+		cycles = 0
+		ct = 0
+	end
+
 	local vct = vm.cb.update
 	local vcl = #vct
 	for i = 1, vcl do
