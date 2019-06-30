@@ -10,7 +10,7 @@ The long-term goal is to create a really neat (but useless) emulated desktop com
 
 Ships with a pre-built boot ROM binary.
 
-![Running the Antecedent 3.x boot firmware](https://i.imgur.com/Su1yALJ.png)
+![Running the Antecedent 3.x boot firmware](https://i.imgur.com/eV6MF9h.png)
 
 ## Running
 
