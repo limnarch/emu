@@ -3,6 +3,9 @@
 
 local w = {}
 
+w.binpack = require("ui/binpack")
+local binpack = w.binpack
+
 w.windows = {}
 
 w.selected = nil
@@ -13,6 +16,11 @@ w.miselect = nil
 w.fs = nil
 
 w.wopen = {}
+
+local bp
+
+local bpxo = 0
+local bpyo = 0
 
 local margin = 20
 
@@ -209,9 +217,48 @@ function w.open(window, x, y)
 
 	w.select(window)
 
+	window:adjust()
+
 	if window.opened then
 		window:opened()
 	end
+end
+
+-- this should only be used during initialization
+function w.pack(window)
+	window:close()
+
+	local jw = window.w
+	local jh = window.h
+
+	local ww,wh = love.graphics.getWidth()
+	local wh = love.graphics.getHeight()
+
+	if not bp then
+		bp = binpack(ww, wh)
+	end
+
+	local rect = bp:insert(jw, jh)
+
+	if not rect then
+		if #w.wopen > 0 then
+			local ex,ey = w.getcsize()
+
+			bpxo = bpxo + ex
+		end
+
+		local e = jh
+
+		if wh > jh then
+			e = wh
+		end
+
+		bp = binpack(jw, e)
+
+		rect = bp:insert(ww, wh)
+	end
+
+	window:open(bpxo + rect.x, bpyo + rect.y)
 end
 
 function w.newObj(parent, width, height)
@@ -376,6 +423,23 @@ function w.new(name, width, height)
 		w.close(self)
 	end
 
+	function e:pack()
+		w.pack(self)
+	end
+
+	function e:adjust()
+		local w = self.w
+		local h = self.h
+
+		for k,v in ipairs(self.elements) do
+			w = math.max(w, v.w + v.x)
+			h = math.max(h, v.h + v.y)
+		end
+
+		self.w = w
+		self.h = h
+	end
+
 	e.clickables = {}
 
 	function e:addClickable(o)
@@ -499,18 +563,22 @@ function w.fullscreen(window)
 	window.y = -20
 end
 
-function w.winterest()
-	local ows = {}
-	ows.width, ows.height, ows.flags = love.window.getMode()
-
+function w.getcsize()
 	local wi,he = margin * 2, margin * 2
-
-	local wl = #w.wopen
 
 	for k,v in ipairs(w.wopen) do
 		wi = math.max(wi, v.w + v.x)
 		he = math.max(he, v.h + v.y)
 	end
+
+	return wi, he
+end
+
+function w.winterest()
+	local ows = {}
+	ows.width, ows.height, ows.flags = love.window.getMode()
+
+	local wi,he = w.getcsize()
 
 	-- some hacks to keep the window centered (depends on platform's coordinates system being sane)
 	local wd = wi - ows.width

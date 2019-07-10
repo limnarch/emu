@@ -58,7 +58,9 @@ local dbmsg = false
 function love.load(arg)
 	vm.log = require("log").init(vm)
 
-	window.init()
+	if window then
+		window.init()
+	end
 
 	vm.computer = require("computer").new(vm, 1024*1024*32) -- new computer with 32mb of mem
 
@@ -82,7 +84,9 @@ function love.load(arg)
 			timed = true
 			i = i + 1
 		elseif arg[i] == "-fbfs" then
-			window.fullscreen(vm.computer.window)
+			if vm.computer.window then
+				window.fullscreen(vm.computer.window)
+			end
 			i = i + 1
 		else
 			print("unrecognized option "..arg[i])
@@ -96,11 +100,13 @@ function love.load(arg)
 
 	if vm.computer.window then
 		if vm.computer.window.gc then
-			vm.computer.window:open()
+			vm.computer.window:pack()
 		end
 	end
 
-	window.winterest()
+	if window then
+		window.winterest()
+	end
 end
 
 local cycles = 0

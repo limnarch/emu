@@ -14,6 +14,10 @@ function bus.new(vm, c)
 	local ports = b.ports
 
 	function b.addPort(num, handler)
+		if ports[num] then
+			error(string.format("citron port 0x%X already taken", num))
+		end
+
 		ports[num] = handler
 	end
 	local addPort = b.addPort

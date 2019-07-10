@@ -566,6 +566,8 @@ function gpu.new(vm, c, page, intn)
 	if c.window then
 		c.window.gc = true
 
+		local y = c.window.h
+
 		local wc = c.window:addElement(window.canvas(c.window, function (self, x, y) 
 			if enabled then
 
@@ -617,7 +619,9 @@ function gpu.new(vm, c, page, intn)
 		end, width, height))
 
 		wc.x = 0
-		wc.y = 20
+		wc.y = y
+
+		c.window:pack()
 
 		local fbdwindow = vm.window.new("!! SCREENSHOT !!", 100, 100)
 

@@ -10,7 +10,7 @@ function block.new(image, blocksize)
 
 	bd.bs = blocksize
 
-	bd.file = io.open(image, "r+")
+	bd.file = io.open(image, "rb+")
 
 	if not bd.file then return false end
 

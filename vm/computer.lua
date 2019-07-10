@@ -3,7 +3,9 @@ local computer = {}
 function computer.new(vm, memsize)
 	local c = {}
 
-	c.window = window.new("LIMNstation", 640, 480)
+	if vm.window then
+		c.window = vm.window.new("LIMNstation", 640, 0)
+	end
 
 	-- chipset
 	c.bus = require("limn/ebus").new(vm, c)
