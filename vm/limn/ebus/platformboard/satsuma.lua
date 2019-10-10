@@ -26,11 +26,11 @@ local ahdb = {}
 --		port 1B: details
 --	5: poll drive
 --		port 1A: drive ID
---  6: enable interrupts
 --	returns:
 --		port 1A: bitfield
 --			bit 0: drive attached here?
 --		port 1B: size in 4kb blocks
+--  6: enable interrupts
 -- port 0x1A: data
 -- port 0x1B: data
 
