@@ -117,6 +117,8 @@ function ahdb.new(vm, c, int, bus)
 			if not self.block then return false end
 
 			self.blocks = self.block.blocks
+
+			return true
 		end
 
 		function d:eject()
@@ -286,7 +288,9 @@ function ahdb.new(vm, c, int, bus)
 			print(string.format("image %s on dks%d", image, x))
 		end
 
-		y:image(image)
+		if not y:image(image) then
+			print("couldn't attach image "..image)
+		end
 
 		return 2
 	end)
