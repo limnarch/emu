@@ -50,6 +50,13 @@ layout.l = {
 	[55]='right', --55
 	[56]='down', --56
 	[57]='up', --57
+
+	[80]='lctrl', --80
+	[81]='rctrl', --81
+	[82]='lshift', --82
+	[83]='rshift', --83
+	[84]='lalt', --84
+	[85]='ralt', --85
 }
 
 for k,v in pairs(layout.l) do
@@ -105,21 +112,33 @@ function keydev.new(vm, c, intw)
 			end
 		elseif v == 2 then -- reset buffer
 			kbd.kbb = {}
+		elseif v == 3 then -- check key pressed
+			if layout.l[kbd.portA] then
+				if love.keyboard.isDown(layout.l[kbd.portA]) then
+					kbd.portA = 0x1
+				else
+					kbd.portA = 0x0
+				end
+			else
+				kbd.portA = 0x0
+			end
 		end
 	end
 
 	if c.window then
 		function c.window.keypressed(key, t)
 			if layout.m[t] then
-				int()
-				if love.keyboard.isDown("lshift") then
-					kbd.kba(0xF0)
-					kbd.kba(layout.m[t])
-				elseif love.keyboard.isDown("lctrl") then
-					kbd.kba(0xF1)
-					kbd.kba(layout.m[t])
-				else
-					kbd.kba(layout.m[t])
+				if layout.m[t] < 80 then
+					int()
+					if love.keyboard.isDown("lshift") then
+						kbd.kba(0xF0)
+						kbd.kba(layout.m[t])
+					elseif love.keyboard.isDown("lctrl") then
+						kbd.kba(0xF1)
+						kbd.kba(layout.m[t])
+					else
+						kbd.kba(layout.m[t])
+					end
 				end
 			end
 		end
