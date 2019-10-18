@@ -12,7 +12,7 @@ function ram256.new(vm, c, branch, intn, memsize)
 	local physmem = ram.physmem
 
 	function ram.handler(s, t, offset, v)
-		if offset > memsize-1 then
+		if offset >= memsize then
 			c.cpu.buserror()
 			return 0
 		end

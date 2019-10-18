@@ -12,6 +12,7 @@ local palette = require("limn/ebus/kinnow3/kinnow_palette")
 -- slot space:
 -- 0000000-0003FFF: declROM
 -- 0004000-000401F: card command ports
+-- 0005000-0024FFF: 128kb driver ROM
 -- 0100000-02FFFFF: possible VRAM
 
 -- == card ==
@@ -43,6 +44,11 @@ local palette = require("limn/ebus/kinnow3/kinnow_palette")
 --    port 1: x1,y1
 --    port 2: x2,y2
 --    port 3: w,h
+--  9: set mode
+--    port 1: mode
+--      modes:
+--        0 - 8 bit grayscale (default)
+--        1 - 8 bit indexed color
 -- port 1: data
 -- port 2: data
 -- port 3: data
@@ -86,6 +92,9 @@ function gpu.new(vm, c, page, intn)
 	local init = false
 
 	local enabled = true
+
+	g.pecrom = c.bus.rom("kinnow3.drvr")
+	local pecrom = g.pecrom
 
 	vm.registerOpt("-kinnow3,display", function (arg, i)
 		local w,h = tonumber(arg[i+1]), tonumber(arg[i+2])
@@ -404,6 +413,40 @@ function gpu.new(vm, c, page, intn)
 		end
 	end
 
+	local mode = 0 -- 8-bit grayscale
+
+	local function setMode(newmode)
+		if newmode == mode then
+			return
+		end
+
+		if (newmode < 0) or (newmode > 1) then
+			return
+		end
+
+		local imageData = love.image.newImageData(width, height)
+
+		if newmode == 1 then
+			imageData:mapPixel(function (x,y,r,g,b,a)
+				local e = palette[framebuffer[y * width + x]]
+
+				return e.r/255,e.g/255,e.b/255,1
+			end)
+		elseif newmode == 0 then
+			imageData:mapPixel(function (x,y,r,g,b,a)
+				local e = framebuffer[y * width + x]
+
+				return e/255,e/255,e/255,1
+			end)
+		end
+
+		image:replacePixels(imageData)
+
+		imageData:release()
+
+		mode = newmode
+	end
+
 	local port13 = 0
 	local port14 = 0
 	local port15 = 0
@@ -492,6 +535,10 @@ function gpu.new(vm, c, page, intn)
 				-- port15 is w,h
 
 				action(port13, port14, port15, 3)
+			elseif v == 9 then -- set mode
+				-- port13 is mode
+
+				setMode(port13)
 			end
 		else
 			return 0
@@ -518,6 +565,8 @@ function gpu.new(vm, c, page, intn)
 				return 0x4B494E58
 			elseif (offset - 8) < 7 then
 				return k2lt[offset - 8]
+			elseif offset == 24 then
+				return 0x5000
 			else
 				return 0
 			end
@@ -552,6 +601,8 @@ function gpu.new(vm, c, page, intn)
 			else
 				return 0
 			end
+		elseif (offset >= 0x5000) and (offset < 0x25000) then -- PEC driver rom
+			return pecrom:h(s, t, offset-0x5000, v)
 		elseif (offset >= 0x100000) and (offset < (0x100000 + fbs - 1)) then
 			return gpuh(s, t, offset-0x100000, v)
 		else
@@ -561,6 +612,7 @@ function gpu.new(vm, c, page, intn)
 
 	function g.reset()
 		g.vsync = false
+		setMode(0)
 	end
 
 	if c.window then
@@ -587,11 +639,19 @@ function gpu.new(vm, c, page, intn)
 
 					local base = (subRectY1 * width) + subRectX1
 
-					imageData:mapPixel(function (x,y,r,g,b,a)
-						local e = palette[framebuffer[base + (y * width + x)]]
+					if mode == 1 then
+						imageData:mapPixel(function (x,y,r,g,b,a)
+							local e = palette[framebuffer[base + (y * width + x)]]
 
-						return e.r/255,e.g/255,e.b/255,1
-					end, 0, 0, uw, uh)
+							return e.r/255,e.g/255,e.b/255,1
+						end, 0, 0, uw, uh)
+					elseif mode == 0 then
+						imageData:mapPixel(function (x,y,r,g,b,a)
+							local e = framebuffer[base + (y * width + x)]
+
+							return e/255,e/255,e/255,1
+						end, 0, 0, uw, uh)
+					end
 
 					image:replacePixels(imageData, nil, nil, subRectX1, subRectY1)
 
@@ -638,6 +698,20 @@ function gpu.new(vm, c, page, intn)
 
 					tid:setPixel(x, y, color.r/255, color.g/255, color.b/255, 1)
 				end
+			end
+
+			if mode == 1 then
+				tid:mapPixel(function (x,y,r,g,b,a)
+					local e = palette[framebuffer[y * width + x]]
+
+					return e.r/255,e.g/255,e.b/255,1
+				end)
+			elseif mode == 0 then
+				tid:mapPixel(function (x,y,r,g,b,a)
+					local e = framebuffer[y * width + x]
+
+					return e/255,e/255,e/255,1
+				end)
 			end
 
 			local fd = tid:encode("png", "KINNOW3.png")
