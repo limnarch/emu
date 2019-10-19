@@ -93,7 +93,7 @@ function gpu.new(vm, c, page, intn)
 
 	local enabled = true
 
-	g.pecrom = c.bus.rom("kinnow3.drvr")
+	g.pecrom = c.bus.rom("limn/ebus/kinnow3/kinnow3.drvr")
 	local pecrom = g.pecrom
 
 	vm.registerOpt("-kinnow3,display", function (arg, i)

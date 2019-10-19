@@ -232,7 +232,7 @@ function bus.new(vm, c)
 
 		local romc = ffi.new("uint8_t[128*1024]")
 
-		local rf = love.filesystem.read("roms/"..name)
+		local rf = love.filesystem.read(name)
 
 		if not rf then
 			error("Couldn't load ROM file "..name)
@@ -260,22 +260,6 @@ function bus.new(vm, c)
 					local u1, u2, u3, u4 = self.bin[offset], self.bin[offset + 1], self.bin[offset + 2], self.bin[offset + 3]
 
 					return (u4 * 0x1000000) + (u3 * 0x10000) + (u2 * 0x100) + u1
-				end
-			elseif t == 1 then
-				if s == 0 then
-					self.bin[offset] = v
-				elseif s == 1 then
-					local u1, u2 = (math.modf(v/256))%256, v%256
-
-					self.bin[offset] = u2
-					self.bin[offset+1] = u1 -- little endian
-				elseif s == 2 then
-					local u1, u2, u3, u4 = (math.modf(v/16777216))%256, (math.modf(v/65536))%256, (math.modf(v/256))%256, v%256
-
-					self.bin[offset] = u4
-					self.bin[offset+1] = u3
-					self.bin[offset+2] = u2
-					self.bin[offset+3] = u1 -- little endian
 				end
 			end
 		end
