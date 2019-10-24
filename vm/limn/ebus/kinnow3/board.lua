@@ -264,14 +264,14 @@ function gpu.new(vm, c, page, intn)
 			local x1 = rx+rw-1
 			local y1 = ry+rh-1
 
-			for y = ry, y1-rows do
+			for y = ry, y1-rows+1 do
 				for x = rx, x1 do
 					local b = y * width + x
 					framebuffer[b] = framebuffer[b + mod]
 				end
 			end
 
-			for y = y1-rows, y1 do
+			for y = y1-rows+1, y1 do
 				for x = rx, x1 do
 					framebuffer[y * width + x] = color
 				end
@@ -612,7 +612,7 @@ function gpu.new(vm, c, page, intn)
 
 	function g.reset()
 		g.vsync = false
-		setMode(0)
+		setMode(1)
 	end
 
 	if c.window then

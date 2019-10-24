@@ -7,11 +7,13 @@ local m = fw*8
 local m2 = m * 2
 
 local cw = 80
-local ch = 24
+local ch = 25
 
 s.swindow = window.new("Terminal", cw * fw + m2, ch * fh + m2)
 
 s.font = love.graphics.newFont("ui/VT323-Regular.ttf", fh)
+
+s.inverted = false
 
 local ctrlkeys = {
 	["2"] = 0,
@@ -96,6 +98,18 @@ local function clear()
 	s.y = 0
 end
 
+local function clearline()
+	local osx = s.x
+
+	while s.x > 0 do
+		s.putc(string.char(0x8))
+		s.putc(" ")
+		s.putc(string.char(0x8))
+	end
+
+	s.x = osx
+end
+
 function s.sanitize(c) -- make sure its not too crazy
 	if c < 0x80 then
 		return c
@@ -107,10 +121,20 @@ end
 function s.drawc(c)
 	love.graphics.setCanvas(s.canvas)
 
-	love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
+	if not s.inverted then
+		love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
+	else
+		love.graphics.setColor(s.fgc[1], s.fgc[2], s.fgc[3], 1)
+	end
+
 	love.graphics.rectangle("fill", s.x*fw,s.y*fh, fw, fh)
 
-	love.graphics.setColor(s.fgc[1], s.fgc[2], s.fgc[3], 1)
+	if s.inverted then
+		love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
+	else
+		love.graphics.setColor(s.fgc[1], s.fgc[2], s.fgc[3], 1)
+	end
+
 	local of = love.graphics.getFont()
 	love.graphics.setFont(s.font)
 	love.graphics.print(c,s.x*fw,s.y*fh)
@@ -118,18 +142,32 @@ function s.drawc(c)
 	love.graphics.setCanvas()
 end
 
-local escv = 0
+local escv = {0}
+
+local function color()
+	if escv[1] == 7 then
+		s.inverted = true
+	elseif escv[1] == 0 then
+		s.inverted = false
+	end
+end
 
 function s.escp(c)
 	if tonumber(c) then
-		escv = escv * 10 + c
+		escv[#escv] = escv[#escv] * 10 + tonumber(c)
+
 		return
 	end
 
 	if c == "[" then return end
-	if c == ";" then return end
+	if c == ";" then
+		escv[#escv + 1] = 0
+
+		return
+	end
 	if c == "c" then clear() end
-	if c == "m" then end
+	if c == "m" then color() end
+	if c == "K" then clearline() end
 
 	s.escape = false
 end
@@ -152,7 +190,11 @@ function s.putc(c)
 			end
 		end
 	elseif c == string.char(0x1B) then
+		escv = {0}
+
 		s.escape = true
+	elseif c == string.char(0xD) then
+		s.x = 0
 	elseif c == "\t" then
 		s.x = (math.floor(s.x / 8) + 1) * 8
 
