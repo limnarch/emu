@@ -49,9 +49,6 @@ function pboard.new(vm, c, branch, intn)
 	local satsumah = satsuma.handler
 	local amtsu = pb.amtsu
 
-	pb.fp = require("limn/ebus/platformboard/frontpanel").new(vm, c, int, citron)
-	local fp = pb.fp
-
 	-- end deeply ugly code to return to only slightly ugly code
 
 

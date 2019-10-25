@@ -10,6 +10,9 @@ function cdev.new(vm, c, int, bus)
 	cl.msr = 0
 	cl.tc = 0
 
+	local epoch = os.time(os.date("!*t"))
+	local et = love.timer.getTime()
+
 	vm.registerCallback("update", function (dt)
 		if cl.msr ~= 0 then
 			cl.tc = cl.tc + dt
@@ -31,6 +34,12 @@ function cdev.new(vm, c, int, bus)
 			if v == 1 then -- set interval
 				cl.msr = portA/1000
 				cl.tc = 0
+			elseif v == 2 then -- get epoch time
+				portA = math.floor(epoch + love.timer.getTime() - et)
+			elseif v == 3 then -- get ms in the second
+				local ms = ((love.timer.getTime() - et) * 1000) % 1000
+
+				portA = math.floor(ms)
 			end
 		else
 			return 0

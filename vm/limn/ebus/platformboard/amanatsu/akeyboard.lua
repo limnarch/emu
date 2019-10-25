@@ -130,7 +130,7 @@ function keydev.new(vm, c, intw)
 			if layout.m[t] then
 				if layout.m[t] < 80 then
 					int()
-					if love.keyboard.isDown("lshift") then
+					if love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift") then
 						kbd.kba(0xF0)
 						kbd.kba(layout.m[t])
 					elseif love.keyboard.isDown("lctrl") then
