@@ -77,7 +77,7 @@ function cpu.new(vm, c)
 
 			--p.vmerr(string.format("fault %x at %x", num, reg[32]))
 
-			fq[sfq + 1] = num
+			fq[sfq + 1] = {num, reg[32]}
 			faultOccurred = true
 		end
 	end
@@ -691,54 +691,13 @@ function cpu.new(vm, c)
 			return pc + 3
 		end,
 
-		[0x4A] = function (pc) -- [httl]
-			if kernelMode() then
-				local htta = reg[36]
+		--[0x4A] = function (pc) -- [RESERVED]
+		--	return pc + 1
+		--end,
 
-				local nrs = 0
-
-				for i = 0, 37 do
-					if i == 34 then
-						nrs = fetchLong(htta+(34*4))
-					else
-						reg[i] = fetchLong(htta+(i*4))
-					end
-				end
-
-				fillState(nrs)
-
-				reg[36] = htta + 38*4
-
-				return reg[32]
-			else
-				fault(3)
-			end
-
-			return pc + 1
-		end,
-
-		[0x4B] = function (pc) -- [htts]
-			if kernelMode() then
-				reg[36] = reg[36] - 38*4
-				local htta = reg[36]
-
-				local nrs = pop()
-				local n0 = pop()
-				local npc = pop()
-
-				for i = 0, 37 do
-					storeLong(htta+(i*4), reg[i])
-				end
-
-				storeLong(htta+(34*4), nrs)
-				storeLong(htta+(0*4), n0)
-				storeLong(htta+(32*4), npc)
-			else
-				fault(3)
-			end
-
-			return pc + 1
-		end,
+		--[0x4B] = function (pc) -- [RESERVED]
+		--	return pc + 1
+		--end,
 
 		[0x4C] = function (pc) -- [cpu]
 			if kernelMode() then
@@ -888,7 +847,7 @@ function cpu.new(vm, c)
 			if (sfq > 0) and (reg[35] ~= 0) then
 				-- do fault
 
-				local n = fq[1]
+				local n = fq[1][1]
 
 				local v = TfetchLong(reg[35] + n*4) -- get vector
 
@@ -903,6 +862,7 @@ function cpu.new(vm, c)
 					push(ors)
 
 					reg[32] = v
+					reg[36] = fq[1][2]
 					reg[0] = n
 					table.remove(fq, 1)
 				end
@@ -991,7 +951,7 @@ function cpu.new(vm, c)
 		"sp",
 		"rs",
 		"ivt",
-		"htta",
+		"fa",
 		"usp",
 
 		"k0",

@@ -7,12 +7,8 @@ function bus.new(vm, c)
 
 	local log = vm.log.log
 
-	b.areas = ffi.new("uint16_t[32]")
 	b.areah = {}
-	local areas = b.areas
 	local areah = b.areah
-
-	local lsa = 0
 
 	b.reseth = {}
 	local reseth = b.reseth
@@ -31,30 +27,18 @@ function bus.new(vm, c)
 	--t = 0: read, v = nil
 	--t = 1: write, v = value
 
+	local function buserrorh(s, t, offset, v)
+		c.cpu.buserror()
+
+		return 0
+	end
+
 	function b.mapArea(page, handler)
-		if areas[page] ~= 0 then
-			b.unmapArea(page)
-		end
-
-		local n = 0
-
-		for i = 1, 32 do
-			if not areah[i] then
-				n = i
-				break
-			end
-		end
-
-		areah[n] = handler
-
-		areas[page] = n
+		areah[page] = handler
 	end
 
 	function b.unmapArea(page)
-		local e = areas[page]
-		areas[page] = 0
-
-		areah[e] = nil
+		areah[page] = buserrorh
 	end
 
 	function b.insertBoard(page, board, ...)
@@ -87,58 +71,19 @@ function bus.new(vm, c)
 	function b.fetchByte(ptr)
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		local m = areas[rshift(ptr, 27)]
-
-		if m ~= 0 then -- mapped
-			lsa = ptr
-
-			local e = areah[m](0, 0, band(ptr, 0x7FFFFFF))
-
-			return e
-		end
-
-		-- no match.
-
-		print(string.format("fb %x lsa %x", ptr, lsa))
-		c.cpu.buserror()
-
-		return 0
+		return areah[rshift(ptr, 27)](0, 0, band(ptr, 0x7FFFFFF))
 	end
 
 	function b.fetchInt(ptr)
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		local m = areas[rshift(ptr, 27)]
-
-		if m ~= 0 then -- mapped
-			lsa = ptr
-			return areah[m](1, 0, band(ptr, 0x7FFFFFF))
-		end
-
-		-- no match.
-
-		print(string.format("fi %x lsa %x", ptr, lsa))
-		c.cpu.buserror()
-
-		return 0
+		return areah[rshift(ptr, 27)](1, 0, band(ptr, 0x7FFFFFF))
 	end
 
 	function b.fetchLong(ptr)
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		local m = areas[rshift(ptr, 27)]
-
-		if m ~= 0 then -- mapped
-			lsa = ptr
-			return areah[m](2, 0, band(ptr, 0x7FFFFFF))
-		end
-
-		-- no match.
-
-		print(string.format("fl %x lsa %x", ptr, lsa))
-		c.cpu.buserror()
-
-		return 0
+		return areah[rshift(ptr, 27)](2, 0, band(ptr, 0x7FFFFFF))
 	end
 
 	--[[
@@ -148,47 +93,23 @@ function bus.new(vm, c)
 	function b.storeByte(ptr, v)
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		local m = areas[rshift(ptr, 27)]
-
-		if m ~= 0 then -- mapped
-			lsa = ptr
-			return areah[m](0, 1, band(ptr, 0x7FFFFFF), v)
-		end
-
-		print(string.format("sb %x lsa %x", ptr, lsa))
-		c.cpu.buserror()
+		areah[rshift(ptr, 27)](0, 1, band(ptr, 0x7FFFFFF), v)
 	end
 
 	function b.storeInt(ptr, v)
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		local m = areas[rshift(ptr, 27)]
-
-		if m ~= 0 then -- mapped
-			lsa = ptr
-			return areah[m](1, 1, band(ptr, 0x7FFFFFF), v)
-		end
-
-		-- no match.
-
-		print(string.format("si %x lsa %x", ptr, lsa))
-		c.cpu.buserror()
+		areah[rshift(ptr, 27)](1, 1, band(ptr, 0x7FFFFFF), v)
 	end
 
 	function b.storeLong(ptr, v)
 		ptr = band(ptr, 0xFFFFFFFF)
-		
-		local m = areas[rshift(ptr, 27)]
 
-		if m ~= 0 then -- mapped
-			lsa = ptr
-			return areah[m](2, 1, band(ptr, 0x7FFFFFF), v)
-		end
+		areah[rshift(ptr, 27)](2, 1, band(ptr, 0x7FFFFFF), v)
+	end
 
-		-- no match.
-
-		print(string.format("sl %x lsa %x", ptr, lsa))
-		c.cpu.buserror()
+	for i = 0, 23 do
+		b.mapArea(i, buserrorh)
 	end
 
 	for i = 24, 31 do

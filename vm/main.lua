@@ -142,14 +142,10 @@ function love.update(dt)
 
 	local cycle = vm.computer.cpu.cycle
 
-	if cycle then
-		xpcall(function ()
-			local t = vm.instructionsPerTick
-			for i = 1, t do
-				cycle()
-				cycles = cycles + 1
-			end
-		end, function (x) vm.computer.cpu.vmerr(x) end)
+	local t = vm.instructionsPerTick
+	for i = 1, t do
+		cycle()
+		cycles = cycles + 1
 	end
 end
 

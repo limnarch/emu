@@ -83,7 +83,7 @@ end
 local function nl()
 	s.x = 0
 	s.y = s.y + 1
-	if s.y == 24 then
+	if s.y == ch then
 		s.y = s.y - 1
 		scroll()
 	end
