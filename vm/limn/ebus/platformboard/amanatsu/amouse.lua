@@ -2,7 +2,7 @@ local mouse = {}
 
 local bor, lshift, band = bor, lshift, band
 
-function mouse.new(vm, c, intw)
+function mouse.new(vm, c)
 	local m = {}
 
 	m.portA = 0
@@ -20,9 +20,11 @@ function mouse.new(vm, c, intw)
 
 	local ifs = {}
 
+	local cint = c.cpu.int
+
 	local function int()
 		if m.intn then
-			intw(m.intn)
+			cint(m.intn)
 		end
 	end
 

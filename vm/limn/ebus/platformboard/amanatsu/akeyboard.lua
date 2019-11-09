@@ -75,15 +75,17 @@ layout.m["kp7"] = 33
 layout.m["kp8"] = 34
 layout.m["kp9"] = 35
 
-function keydev.new(vm, c, intw)
+function keydev.new(vm, c)
 	local kbd = {}
 	kbd.kbb = {}
 
 	kbd.mid = 0x8FC48FC4
 
+	local cint = c.cpu.int
+
 	local function int()
 		if kbd.intn then
-			intw(kbd.intn)
+			cint(kbd.intn)
 		end
 	end
 

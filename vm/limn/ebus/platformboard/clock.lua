@@ -5,10 +5,12 @@ local cdev = {}
 --	1: set interval
 -- port 0x21: data
 
-function cdev.new(vm, c, int, bus)
+function cdev.new(vm, c, bus)
 	local cl = {}
 	cl.msr = 0
 	cl.tc = 0
+
+	local int = c.cpu.int
 
 	local epoch = os.time(os.date("!*t"))
 	local et = love.timer.getTime()
@@ -18,7 +20,7 @@ function cdev.new(vm, c, int, bus)
 			cl.tc = cl.tc + dt
 			while cl.tc > cl.msr do
 				cl.tc = cl.tc - cl.msr
-				int(0x36)
+				int(0x22)
 			end
 		end
 	end)

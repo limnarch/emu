@@ -17,7 +17,7 @@ end
 
 ]]
 
-function serial.new(vm, c, int, bus)
+function serial.new(vm, c, bus)
 	local s = {}
 
 	local stdo = false
@@ -26,6 +26,8 @@ function serial.new(vm, c, int, bus)
 
 	local port11 = 0xFFFF
 
+	local int = c.cpu.int
+
 	local iq = {}
 	local oq = {}
 
@@ -33,7 +35,7 @@ function serial.new(vm, c, int, bus)
 		iq[#iq + 1] = c
 
 		if doint then
-			int(0x2B)
+			int(0x21)
 		end
 	end
 

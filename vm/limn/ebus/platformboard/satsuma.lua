@@ -34,7 +34,7 @@ local ahdb = {}
 -- port 0x1A: data
 -- port 0x1B: data
 
-function ahdb.new(vm, c, int, bus)
+function ahdb.new(vm, c, bus)
 	local b = {}
 
 	local log = vm.log.log
@@ -48,6 +48,8 @@ function ahdb.new(vm, c, int, bus)
 
 	local busy = 0
 	local busyw
+
+	local int = c.cpu.int
 
 	b.buffer = ffi.new("uint8_t[4096]")
 	local buffer = b.buffer
@@ -143,7 +145,7 @@ function ahdb.new(vm, c, int, bus)
 		infodetails = details
 
 		if doint then
-			int(0x31)
+			int(0x20)
 		end
 	end
 

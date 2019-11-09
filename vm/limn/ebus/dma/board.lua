@@ -71,7 +71,7 @@ function dmacon.new(vm, c, branch, intn, memsize)
 	function dma.op()
 		local tsize = registers[5]
 
-		log(string.format("dma: src %X dest %X sinc %d dinc %d count %d tmode %d", registers[0], registers[1], registers[2], registers[3], registers[4], registers[5]))
+		--log(string.format("dma: src %X dest %X sinc %d dinc %d count %d tmode %d", registers[0], registers[1], registers[2], registers[3], registers[4], registers[5]))
 
 		if tsize == 0 then
 			opbyte()
@@ -104,13 +104,13 @@ function dmacon.new(vm, c, branch, intn, memsize)
 			registers[offset/4] = v
 
 			if getBit(registers[6], 0) == 1 then
-				busyw = vm.registerTimed(registers[4]*0.0000002, function ()
+				--busyw = vm.registerTimed(registers[4]*0.0000002, function ()
 					op()
 					if getBit(registers[6], 1) == 1 then
 						c.cpu.int(intn)
 					end
 					registers[6] = setBit(registers[6], 0, 0)
-				end)
+				--end)
 			end
 		end
 	end

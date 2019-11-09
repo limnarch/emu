@@ -17,14 +17,7 @@ function pboard.new(vm, c, branch, intn)
 
 	local pb = {}
 
-	pb.intq = {}
-	local intq = pb.intq
-	function pb.int(n)
-		intq[#intq + 1] = n
-		c.cpu.int(intn)
-	end
-	local int = pb.int
-
+	local int = c.cpu.int
 
 	-- deeply ugly code here
 
@@ -41,10 +34,10 @@ function pboard.new(vm, c, branch, intn)
 	local citron = pb.citron
 	local citronh = citron.bush
 
-	pb.serial = require("limn/ebus/platformboard/serial").new(vm, c, int, citron)
-	pb.clock = require("limn/ebus/platformboard/clock").new(vm, c, int, citron)
+	pb.serial = require("limn/ebus/platformboard/serial").new(vm, c, citron)
+	pb.clock = require("limn/ebus/platformboard/clock").new(vm, c, citron)
 	pb.amtsu = require("limn/ebus/platformboard/amanatsu/bus").new(vm, c, citron)
-	pb.satsuma = require("limn/ebus/platformboard/satsuma").new(vm, c, int, citron)
+	pb.satsuma = require("limn/ebus/platformboard/satsuma").new(vm, c, citron)
 	local satsuma = pb.satsuma
 	local satsumah = satsuma.handler
 	local amtsu = pb.amtsu
@@ -74,12 +67,6 @@ function pboard.new(vm, c, branch, intn)
 					registers[offset/4] = v
 				end
 			end
-		elseif offset == 0x7FC then
-			if t == 0 then
-				return table.remove(intq, 1) or 0xFFFFFFFF
-			else
-				intq = {}
-			end
 		else
 			return 0
 		end
@@ -103,8 +90,6 @@ function pboard.new(vm, c, branch, intn)
 	end
 
 	function pb.reset()
-		intq = {}
-
 		pb.clock.reset()
 		pb.serial.reset()
 		satsuma.reset()
@@ -112,13 +97,13 @@ function pboard.new(vm, c, branch, intn)
 	end
 
 	vm.registerOpt("-keyboard", function (arg, i)
-		amtsu.addDevice(require("limn/ebus/platformboard/amanatsu/akeyboard").new(vm, c, int))
+		amtsu.addDevice(require("limn/ebus/platformboard/amanatsu/akeyboard").new(vm, c))
 
 		return 1
 	end)
 
 	vm.registerOpt("-mouse", function (arg, i)
-		amtsu.addDevice(require("limn/ebus/platformboard/amanatsu/amouse").new(vm, c, int))
+		amtsu.addDevice(require("limn/ebus/platformboard/amanatsu/amouse").new(vm, c))
 
 		return 1
 	end)
