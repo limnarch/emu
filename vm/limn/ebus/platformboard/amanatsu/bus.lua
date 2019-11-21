@@ -107,6 +107,8 @@ function pbus.new(vm, c, b)
 			if dev[bcon.portB] then
 				dev[bcon.portB].intn = bcon.portA
 			end
+		elseif v == 2 then -- reset
+			a.reset()
 		end
 	end
 
