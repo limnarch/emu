@@ -10,7 +10,7 @@ The long-term goal is to create a really neat (but useless) emulated desktop com
 
 Ships with a pre-built [boot ROM](https://github.com/limnarch/a3x) binary.
 
-![Running the Antecedent 3.x boot firmware](https://i.imgur.com/mIK4Pmd.png)
+![Running the Antecedent 3.x boot firmware](https://i.imgur.com/79i4yL8.png)
 
 ## Running
 
