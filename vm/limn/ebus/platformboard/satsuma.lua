@@ -5,7 +5,7 @@ local ahdb = {}
 
 -- block size is 4096 bytes
 
--- interrupt 0x31 is raised when new information is available
+-- interrupt 0x20 is raised when new information is available
 
 -- port 0x19: commands
 --	0: idle
@@ -31,6 +31,7 @@ local ahdb = {}
 --			bit 0: drive attached here?
 --		port 1B: size in 4kb blocks
 --  6: enable interrupts
+--  7: disable interrupts
 -- port 0x1A: data
 -- port 0x1B: data
 
@@ -245,6 +246,8 @@ function ahdb.new(vm, c, bus)
 				end
 			elseif v == 6 then -- enable interrupts
 				doint = true
+			elseif v == 7 then -- disable interrupts
+				doint = false
 			end
 		end
 	end)

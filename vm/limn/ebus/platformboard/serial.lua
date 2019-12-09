@@ -6,6 +6,7 @@ local serial = {}
 --	1: write
 --	2: read
 --  3: enable interrupts
+--  4: disable interrupts
 -- port 0x11: in/out byte
 
 local tc = [[
@@ -59,6 +60,8 @@ function serial.new(vm, c, bus)
 				end
 			elseif v == 3 then
 				doint = true
+			elseif v == 4 then
+				doint = false
 			end
 		else
 			return 0 -- always idle since this is all synchronous (god bless emulators)

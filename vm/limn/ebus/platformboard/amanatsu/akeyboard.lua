@@ -94,7 +94,7 @@ function keydev.new(vm, c)
 	end
 
 	function kbd.kba(k)
-		if #kbd.kbb < 16 then
+		if #kbd.kbb < 4 then
 			table.insert(kbd.kbb, 1, k)
 		else
 			kbd.kbb[#kbd.kbb] = nil

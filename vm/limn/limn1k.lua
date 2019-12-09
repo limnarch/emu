@@ -176,6 +176,9 @@ function cpu.new(vm, c)
 		local resetVector = TfetchLong(0xFFFE0000)
 
 		reg[32] = resetVector
+
+		intq = {}
+		fq = {}
 	end
 	local reset = p.reset
 
@@ -844,7 +847,12 @@ function cpu.new(vm, c)
 			local sfq = #fq
 			-- if faults in queue, and vector table initialized
 			-- all faults are non-maskable!
-			if (sfq > 0) and (reg[35] ~= 0) then
+			if (sfq > 0) then
+				if reg[35] == 0 then
+					p.reset()
+					return
+				end
+
 				-- do fault
 
 				local n = fq[1][1]
@@ -865,13 +873,20 @@ function cpu.new(vm, c)
 					reg[36] = fq[1][2]
 					reg[0] = n
 					table.remove(fq, 1)
+				else
+					p.reset()
 				end
 			end
 
 			if sfq == 0 then
 				local siq = #intq
 				-- if interrupts in queue, vector table initialized, and interrupts enabled
-				if (siq > 0) and (reg[35] ~= 0) and (getState(1) == 1) then
+				if (siq > 0) and (getState(1) == 1) then
+					if reg[35] == 0 then
+						p.reset()
+						return
+					end
+
 					-- do interrupt
 
 					local n = intq[1] -- get num
