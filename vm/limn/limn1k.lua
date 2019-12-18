@@ -39,8 +39,6 @@ function cpu.new(vm, c)
 	local TstoreInt = mmu.TstoreInt
 	local TstoreLong = mmu.TstoreLong
 
-	local translate = mmu.translate
-
 	p.nstall = 0
 	function p.stall(cycles)
 		p.nstall = p.nstall + cycles

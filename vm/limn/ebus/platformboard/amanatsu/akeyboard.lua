@@ -3,7 +3,7 @@ local keydev = {}
 -- implements a AISA keyboard on the Amanatsu bus
 -- commands:
 --  0: idle
---  1: pop scancode from queue
+--  1: get last key pressed
 -- portA: data
 
 -- raises interrupt when a key is pressed
@@ -77,7 +77,6 @@ layout.m["kp9"] = 35
 
 function keydev.new(vm, c)
 	local kbd = {}
-	kbd.kbb = {}
 
 	kbd.mid = 0x8FC48FC4
 
@@ -89,31 +88,30 @@ function keydev.new(vm, c)
 		end
 	end
 
-	function kbd.kbp()
-		return table.remove(kbd.kbb,#kbd.kbb)
-	end
+	local ctrl = false
+	local shift = false
 
-	function kbd.kba(k)
-		if #kbd.kbb < 4 then
-			table.insert(kbd.kbb, 1, k)
-		else
-			kbd.kbb[#kbd.kbb] = nil
-			table.insert(kbd.kbb, 1, k)
-		end
-	end
+	local lastkey = 0xFFFF
 
 	kbd.portA = 0xFFFF
 	kbd.portB = 0
 
 	function kbd.action(v)
 		if v == 1 then -- pop scancode
-			if #kbd.kbb > 0 then
-				kbd.portA = kbd.kbp()
+			if ctrl then
+				kbd.portA = 0xF1
+				ctrl = false
+			elseif shift then
+				kbd.portA = 0xF0
+				shift = false
 			else
-				kbd.portA = 0xFFFF
+				kbd.portA = lastkey
+				lastkey = 0xFFFF
 			end
-		elseif v == 2 then -- reset buffer
-			kbd.kbb = {}
+		elseif v == 2 then -- reset
+			lastkey = 0xFFFF
+			shift = false
+			ctrl = false
 		elseif v == 3 then -- check key pressed
 			if layout.l[kbd.portA] then
 				if love.keyboard.isDown(layout.l[kbd.portA]) then
@@ -133,21 +131,25 @@ function keydev.new(vm, c)
 				if layout.m[t] < 80 then
 					int()
 					if love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift") then
-						kbd.kba(0xF0)
-						kbd.kba(layout.m[t])
+						shift = true
+						ctrl = false
 					elseif love.keyboard.isDown("lctrl") then
-						kbd.kba(0xF1)
-						kbd.kba(layout.m[t])
+						ctrl = true
+						shift = false
 					else
-						kbd.kba(layout.m[t])
+						ctrl = false
+						shift = false
 					end
+					lastkey = layout.m[t]
 				end
 			end
 		end
 	end
 
 	function kbd.reset()
-		kbd.kbb = {}
+		lastkey = 0xFFFF
+		shift = false
+		ctrl = false
 	end
 
 	return kbd
