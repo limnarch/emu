@@ -28,19 +28,17 @@ function mouse.new(vm, c)
 		end
 	end
 
-	local function fmtn(n)
-		local nn = band(math.abs(n), 0x7FFF)
-
+	local function fmtn(n) -- two's complement
 		if n < 0 then
-			n = bor(nn, 0x8000)
+			n = band(bnot(math.abs(n))+1, 0xFFFF)
 		end
 
 		return n
 	end
 
 	function m.info(i1, i2)
-		if #ifs >= 8 then
-			ifs[8] = nil
+		if #ifs >= 4 then
+			ifs[4] = nil
 		end
 
 		ifs[#ifs+1] = {i1, i2}
@@ -55,12 +53,6 @@ function mouse.new(vm, c)
 			m.portB = ift[2]
 		elseif v == 2 then -- reset
 			ifs = {}
-			adx = 0
-			ady = 0
-		elseif v == 3 then -- get dx and dy since last poll
-			m.portA = fmtn(adx)
-			m.portB = fmtn(ady)
-
 			adx = 0
 			ady = 0
 		end

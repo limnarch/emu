@@ -54,8 +54,6 @@ local palette = require("limn/ebus/kinnow3/kinnow_palette")
 -- port 3: data
 -- port 4: pixelpipe
 
--- poorly written in some spots and doesn't do some bounds checks, a badly written driver could cause the vm to segfault here
-
 
 function gpu.new(vm, c, page, intn)
 	local g = {}
@@ -75,7 +73,7 @@ function gpu.new(vm, c, page, intn)
 	local fbs = width * height
 	local bytesPerRow = width
 
-	g.framebuffer = ffi.new("uint8_t[?]", fbs) -- least significant bit is left-most pixel
+	g.framebuffer = ffi.new("uint8_t[?]", fbs)
 	local framebuffer = g.framebuffer
 
 	local imageData = love.image.newImageData(width, height)
@@ -486,7 +484,7 @@ function gpu.new(vm, c, page, intn)
 				local w = rshift(port14, 16)
 				local h = band(port14, 0xFFFF)
 
-				log(string.format("kinnow3: pixelpipe read x%d y%d w%d h%d", x, y, w, h))
+				--log(string.format("kinnow3: pixelpipe read x%d y%d w%d h%d", x, y, w, h))
 
 				pxpiperX = x
 				pxpiperY = y
@@ -510,7 +508,7 @@ function gpu.new(vm, c, page, intn)
 				local pattern = band(rshift(port15, 8), 0xFF)
 				local writetype = band(port15, 0xFF)
 
-				log(string.format("kinnow3: pixelpipe write x%d y%d w%d h%d fg%d bg%d pattern%d writetype%d", x, y, w, h, fg, bg, pattern, writetype))
+				--log(string.format("kinnow3: pixelpipe write x%d y%d w%d h%d fg%d bg%d pattern%d writetype%d", x, y, w, h, fg, bg, pattern, writetype))
 
 				pxpipewX = x
 				pxpipewY = y
