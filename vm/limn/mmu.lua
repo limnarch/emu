@@ -123,7 +123,7 @@ function mmu.new(vm, c)
 
 	function m.fetchLong(ptr)
 		if not m.translating then
-			if (ptr >= 0xB8000000) and (ptr < 0xB8000020) then
+			if (ptr >= 0xB8000000) and (ptr < 0xB8000080) then
 				local optr = ptr - 0xB8000000
 				if optr % 4 == 0 then
 					return registers[optr / 4]
@@ -154,7 +154,7 @@ function mmu.new(vm, c)
 
 	function m.storeLong(ptr, v)
 		if not m.translating then
-			if (ptr >= 0xB8000000) and (ptr < 0xB8000020) then
+			if (ptr >= 0xB8000000) and (ptr < 0xB8000080) then
 				local optr = ptr - 0xB8000000
 				if optr % 4 == 0 then
 					registers[optr / 4] = v

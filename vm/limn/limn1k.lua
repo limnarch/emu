@@ -18,6 +18,9 @@ function cpu.new(vm, c)
 	p.fq = {}
 	local fq = p.fq
 
+	p.ignoredint = ffi.new("bool[256]")
+	local ignoredint = p.ignoredint
+
 	local running = true
 
 	local cpuid = 0x80010000
@@ -796,11 +799,29 @@ function cpu.new(vm, c)
 
 			return pc + 6
 		end,
+		[0x54] = function (pc) -- [imask]
+			if kernelMode() then
+				ignoredint[pgReg(fetchByte(pc + 1))] = true
+			else
+				fault(3) -- privilege violation
+			end
+
+			return pc + 2
+		end,
+		[0x55] = function (pc) -- [iunmask]
+			if kernelMode() then
+				ignoredint[pgReg(fetchByte(pc + 1))] = false
+			else
+				fault(3) -- privilege violation
+			end
+
+			return pc + 2
+		end,
 
 		-- temporary for vm debug purposes
 
 		[0xF0] = function (pc) -- [] dump all registers to terminal
-			for i = 0, 36 do
+			for i = 0, 41 do
 				print(string.format("%X = %X", i, reg[i]))
 			end
 
@@ -889,26 +910,32 @@ function cpu.new(vm, c)
 
 					local n = intq[1] -- get num
 
-					local v = TfetchLong(reg[35] + n*4) -- get vector
+					if not ignoredint[intq[1]] then
+						local v = TfetchLong(reg[35] + n*4) -- get vector
 
-					local ors = reg[34]
-
-					if v ~= 0 then
 						local ors = reg[34]
-						setState(0, 0) -- kernel mode
-						setState(1, 0) -- disable interrupts
-						setState(2, 0) -- disable mmu
 
-						push(reg[32])
-						push(reg[0])
-						push(ors)
+						if v ~= 0 then
+							local ors = reg[34]
+							setState(0, 0) -- kernel mode
+							setState(1, 0) -- disable interrupts
+							setState(2, 0) -- disable mmu
 
-						reg[32] = v
-						reg[0] = n
+							push(reg[32])
+							push(reg[0])
+							push(ors)
+
+							reg[32] = v
+							reg[0] = n
+							table.remove(intq, 1)
+						else -- re-raise as spurious interrupt
+							table.remove(intq, 1)
+							fault(9)
+						end
+					else
+						-- nevermind
 						table.remove(intq, 1)
-					else -- re-raise as spurious interrupt
-						table.remove(intq, 1)
-						fault(9)
+						intq[#intq + 1] = n
 					end
 				end
 			end
