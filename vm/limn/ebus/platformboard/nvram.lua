@@ -29,9 +29,9 @@ function nvram.new(vm, c)
 			end
 		elseif t == 1 then
 			if s == 0 then
-				mem[offset] = v
+				mem[offset] = band(v,0xFF)
 
-				sm[offset] = v
+				sm[offset] = band(v,0xFF)
 			elseif s == 1 then
 				local u1, u2 = (math.modf(v/256))%256, v%256
 

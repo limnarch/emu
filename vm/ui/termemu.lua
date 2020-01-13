@@ -1,7 +1,7 @@
 local s = {}
 
 local fw = 8
-local fh = 18
+local fh = 14
 
 local m = fw*8
 local m2 = m * 2
@@ -11,7 +11,7 @@ local ch = 25
 
 s.swindow = window.new("Terminal", cw * fw + m2, ch * fh + m2)
 
-s.font = love.graphics.newFont("ui/VT323-Regular.ttf", fh)
+s.font = love.graphics.newFont("ui/terminus.ttf", fh)
 
 s.inverted = false
 
@@ -215,8 +215,10 @@ local function draw(_, dx, dy)
 	love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
 	love.graphics.rectangle("fill", dx, dy, fw * cw + m2, fh * ch + m2)
 
-	love.graphics.setColor(0xFF/0xFF, 0xFF/0xFF, 0xFF/0xFF, 1)
+	love.graphics.setColor(1, 1, 1, 1)
 	love.graphics.draw(s.canvas, dx+m, dy+m)
+
+	love.graphics.setColor(s.fgc[1], s.fgc[2], s.fgc[3], 1)
 	love.graphics.rectangle("fill", s.x*fw + dx + m, s.y*fh + dy + m, fw, fh)
 end
 

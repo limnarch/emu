@@ -21,7 +21,7 @@ function ram256.new(vm, c, branch, intn, memsize)
 			if t == 0 then
 				return physmem[offset]
 			else
-				physmem[offset] = v
+				physmem[offset] = band(v,0xFF)
 			end
 		elseif s == 1 then -- int
 			if t == 0 then

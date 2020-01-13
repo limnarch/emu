@@ -17,7 +17,7 @@ vm.window = window
 
 vm.speed = 1
 
-vm.hz = 5000000
+vm.hz = 6000000
 vm.targetfps = 60
 vm.instructionsPerTick = 0
 

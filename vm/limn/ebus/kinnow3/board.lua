@@ -13,6 +13,7 @@ local palette = require("limn/ebus/kinnow3/kinnow_palette")
 -- 0000000-0003FFF: declROM
 -- 0004000-000401F: card command ports
 -- 0005000-0024FFF: 128kb driver ROM
+-- 00FFF00-00FFFFF: 256 byte cursor image
 -- 0100000-02FFFFF: possible VRAM
 
 -- == card ==
@@ -49,6 +50,11 @@ local palette = require("limn/ebus/kinnow3/kinnow_palette")
 --      modes:
 --        0 - 8 bit grayscale (default)
 --        1 - 8 bit indexed color
+--  10: set cursor parameters
+--     port 1: ignore
+--     port 2: w,h
+--  11: set cursor position
+--     port 1: x,y
 -- port 1: data
 -- port 2: data
 -- port 3: data
@@ -64,10 +70,10 @@ function gpu.new(vm, c, page, intn)
 		c.cpu.int(intn)
 	end
 
-	g.height = 768
+	g.height = 1024
 	local height = g.height
 
-	g.width = 1024
+	g.width = 1280
 	local width = g.width
 
 	local fbs = width * height
@@ -75,6 +81,16 @@ function gpu.new(vm, c, page, intn)
 
 	g.framebuffer = ffi.new("uint8_t[?]", fbs)
 	local framebuffer = g.framebuffer
+
+	g.cursor = ffi.new("uint8_t[256]")
+	local cursor = g.cursor
+
+	local curx = 0
+	local cury = 0
+	local curbg = 0
+	local curmod = false
+	local curw = 0
+	local curh = 0
 
 	local imageData = love.image.newImageData(width, height)
 	 
@@ -308,6 +324,48 @@ function gpu.new(vm, c, page, intn)
 		end
 	end
 
+	local function curhn(s, t, offset, v)
+		if s == 0 then -- byte
+			if t == 0 then
+				return cursor[offset]
+			else
+				cursor[offset] = v
+			end
+		elseif s == 1 then -- int
+			if t == 0 then
+				local u1, u2 = cursor[offset], cursor[offset + 1]
+
+				return (u2 * 0x100) + u1
+			else
+				-- 2 modified pixels
+
+				local e1 = band(v, 0xFF)
+				local e2 = rshift(band(v, 0xFF00), 8)
+
+				cursor[offset] = e1
+				cursor[offset + 1] = e2
+			end
+		elseif s == 2 then -- long
+			if t == 0 then
+				local u1, u2, u3, u4 = cursor[offset], cursor[offset + 1], cursor[offset + 2], cursor[offset + 3]
+
+				return (u4 * 0x1000000) + (u3 * 0x10000) + (u2 * 0x100) + u1
+			else
+				-- 4 modified pixels
+
+				local e1 = band(v, 0xFF)
+				local e2 = rshift(band(v, 0xFF00), 8)
+				local e3 = rshift(band(v, 0xFF0000), 16)
+				local e4 = rshift(band(v, 0xFF000000), 24)
+
+				cursor[offset] = e1
+				cursor[offset + 1] = e2
+				cursor[offset + 2] = e3
+				cursor[offset + 3] = e4
+			end
+		end
+	end
+
 	local pxpiperX = 0
 	local pxpiperY = 0
 	local pxpiperW = 0
@@ -537,6 +595,30 @@ function gpu.new(vm, c, page, intn)
 				-- port13 is mode
 
 				setMode(port13)
+			elseif v == 10 then -- set cursor parameters
+				-- port13 is ignore color
+				-- port14 is w,h
+
+				local w = rshift(port14, 16)
+				local h = band(port14, 0xFFFF)
+
+				print(w,h)
+
+				if (w*h > 256) then
+					return
+				end
+
+				curw = w
+				curh = h
+
+				curbg = port13
+
+				curmod = true
+			elseif v == 11 then -- set cursor position
+				-- port13 is x,y
+
+				curx = rshift(port13, 16)
+				cury = band(port13, 0xFFFF)
 			end
 		else
 			return 0
@@ -601,6 +683,8 @@ function gpu.new(vm, c, page, intn)
 			end
 		elseif (offset >= 0x5000) and (offset < 0x25000) then -- PEC driver rom
 			return pecrom:h(s, t, offset-0x5000, v)
+		elseif (offset >= 0x0FFF00) and (offset < 0x100000) then
+			return curhn(s, t, offset-0x0FFF00, v)
 		elseif (offset >= 0x100000) and (offset < (0x100000 + fbs - 1)) then
 			return gpuh(s, t, offset-0x100000, v)
 		else
@@ -613,6 +697,8 @@ function gpu.new(vm, c, page, intn)
 		setMode(1)
 	end
 
+	local curimage
+
 	if c.window then
 		c.window.gc = true
 
@@ -620,6 +706,32 @@ function gpu.new(vm, c, page, intn)
 
 		local wc = c.window:addElement(window.canvas(c.window, function (self, x, y) 
 			if enabled then
+
+				if curmod then
+					if curimage then
+						curimage:release()
+					end
+
+					local imageData = love.image.newImageData(curw, curh)
+
+					imageData:mapPixel(function (x,y,r,g,b,a)
+						local c = cursor[y * curw + x]
+
+						if c == curbg then
+							return 0,0,0,0
+						else
+							local e = palette[c]
+
+							return e.r/255,e.g/255,e.b/255,1
+						end
+					end, 0, 0, uw, uh)
+
+					curimage = love.graphics.newImage(imageData)
+
+					imageData:release()
+
+					curmod = false
+				end
 
 				if m then
 					if not init then
@@ -661,6 +773,18 @@ function gpu.new(vm, c, page, intn)
 
 				love.graphics.setColor(1,1,1,1)
 				love.graphics.draw(image, x, y, 0)
+
+				if (curimage and (curw > 0) and (curh > 0)) then
+					if curx > (width - curw) then
+						curx = width - curw
+					end
+
+					if cury > (height - curh) then
+						cury = height - curh
+					end
+
+					love.graphics.draw(curimage, x+curx, y+cury, 0)
+				end
 
 				if not init then
 					love.graphics.setColor(0.5,0.2,0.3,1)

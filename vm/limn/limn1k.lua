@@ -23,6 +23,8 @@ function cpu.new(vm, c)
 
 	local running = true
 
+	local idling = false
+
 	local cpuid = 0x80010000
 
 	local mmu = c.mmu
@@ -655,7 +657,7 @@ function cpu.new(vm, c)
 		end,
 		[0x47] = function (pc) -- [hlt]
 			if kernelMode() then
-				running = false
+				idling = true
 			else
 				fault(3) -- privilege violation
 			end
@@ -706,6 +708,7 @@ function cpu.new(vm, c)
 		[0x4C] = function (pc) -- [cpu]
 			if kernelMode() then
 				reg[0] = cpuid
+				reg[1] = vm.hz
 			else
 				fault(3)
 			end
@@ -855,6 +858,14 @@ function cpu.new(vm, c)
 	local optable = p.optable
 
 	function p.cycle()
+		if idling then
+			if (#fq + #intq) > 0 then
+				idling = false
+			else
+				return
+			end
+		end
+
 		if running then
 			if p.nstall > 0 then
 				p.nstall = p.nstall - 1
