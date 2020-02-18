@@ -8,8 +8,11 @@ function bnand(a,b)
 	return bnot(band(a,b))
 end
 
-local m = {253, 251, 247, 239, 223, 191, 127}
-m[0] = 254
+local m = {}
+
+for i = 0, 31 do
+	m[i] = bnot(lshift(1, i))
+end
 
 function setBit(v,n,x) -- set bit n in v to x
 	if x == 1 then
