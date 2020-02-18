@@ -48,7 +48,7 @@ local palette = require("limn/ebus/kinnow3/kinnow_palette")
 --  9: set mode
 --    port 1: mode
 --      modes:
---        0 - 8 bit grayscale (default)
+--        0 - 8 bit grayscale
 --        1 - 8 bit indexed color
 --  10: set cursor parameters
 --     port 1: ignore
@@ -601,8 +601,6 @@ function gpu.new(vm, c, page, intn)
 
 				local w = rshift(port14, 16)
 				local h = band(port14, 0xFFFF)
-
-				print(w,h)
 
 				if (w*h > 256) then
 					return
