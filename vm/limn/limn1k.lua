@@ -211,6 +211,8 @@ function cpu.new(vm, c)
 	end
 	local pop = p.pop
 
+	local qq = false
+
 	p.optable = {
 		[0x0] = function (pc) -- [nop]
 			return pc + 1
@@ -854,6 +856,18 @@ function cpu.new(vm, c)
 
 			return pc + 1
 		end,
+		[0xF4] = function (pc) -- [] pause if qq is true
+			if qq then
+				idling = true
+			end
+
+			return pc + 1
+		end,
+		[0xF5] = function (pc) -- [] set qq true
+			qq = true
+
+			return pc + 1
+		end,
 	}
 	local optable = p.optable
 
@@ -1064,6 +1078,11 @@ function cpu.new(vm, c)
 		function p.window:keypressed(key, t)
 			if key == "return" then
 				running = not running
+
+				if idling then
+					idling = false
+					running = true
+				end
 			elseif key == "escape" then
 				fault(0x5)
 			elseif key == "r" then
