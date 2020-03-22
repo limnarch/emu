@@ -20,7 +20,7 @@ function dmacon.new(vm, c, branch, intn, memsize)
 	local writeLong = c.bus.storeLong
 	local readLong = c.bus.fetchLong
 
-	dma.registers = ffi.new("uint32_t[7]")
+	dma.registers = ffi.new("uint32_t[10]")
 	local registers = dma.registers
 
 	local function opbyte()
@@ -29,12 +29,20 @@ function dmacon.new(vm, c, branch, intn, memsize)
 		local sinc = registers[2]
 		local dinc = registers[3]
 		local count = registers[4]
+		local lines = registers[7]
+		local destmod = registers[8]
+		local srcmod = registers[9]
 
-		for i = 0, count - 1 do
-			writeByte(dest, readByte(source))
+		for line = 0, lines - 1 do
+			for i = 0, count - 1 do
+				writeByte(dest, readByte(source))
 
-			source = source + sinc
-			dest = dest + dinc
+				source = source + sinc
+				dest = dest + dinc
+			end
+
+			dest = dest + destmod
+			source = source + srcmod
 		end
 	end
 
@@ -44,12 +52,20 @@ function dmacon.new(vm, c, branch, intn, memsize)
 		local sinc = registers[2]
 		local dinc = registers[3]
 		local count = registers[4]
+		local lines = registers[7]
+		local destmod = registers[8]
+		local srcmod = registers[9]
 
-		for i = 0, count - 1 do
-			writeInt(dest, readInt(source))
+		for line = 0, lines - 1 do
+			for i = 0, count - 1 do
+				writeInt(dest, readInt(source))
 
-			source = source + sinc
-			dest = dest + dinc
+				source = source + sinc
+				dest = dest + dinc
+			end
+
+			dest = dest + destmod
+			source = source + srcmod
 		end
 	end
 
@@ -59,12 +75,20 @@ function dmacon.new(vm, c, branch, intn, memsize)
 		local sinc = registers[2]
 		local dinc = registers[3]
 		local count = registers[4]
+		local lines = registers[7]
+		local destmod = registers[8]
+		local srcmod = registers[9]
 
-		for i = 0, count - 1 do
-			writeLong(dest, readLong(source))
+		for line = 0, lines - 1 do
+			for i = 0, count - 1 do
+				writeLong(dest, readLong(source))
 
-			source = source + sinc
-			dest = dest + dinc
+				source = source + sinc
+				dest = dest + dinc
+			end
+
+			dest = dest + destmod
+			source = source + srcmod
 		end
 	end
 

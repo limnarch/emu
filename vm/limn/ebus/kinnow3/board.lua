@@ -70,10 +70,10 @@ function gpu.new(vm, c, page, intn)
 		c.cpu.int(intn)
 	end
 
-	g.height = 1024
+	g.height = 768
 	local height = g.height
 
-	g.width = 1280
+	g.width = 1024
 	local width = g.width
 
 	local fbs = width * height
@@ -107,8 +107,8 @@ function gpu.new(vm, c, page, intn)
 
 	local enabled = true
 
-	g.pecrom = c.bus.rom("limn/ebus/kinnow3/kinnow3.drvr")
-	local pecrom = g.pecrom
+	g.aucrom = c.bus.rom("limn/ebus/kinnow3/kinnow3.u")
+	local aucrom = g.aucrom
 
 	vm.registerOpt("-kinnow3,display", function (arg, i)
 		local w,h = tonumber(arg[i+1]), tonumber(arg[i+2])
@@ -679,8 +679,8 @@ function gpu.new(vm, c, page, intn)
 			else
 				return 0
 			end
-		elseif (offset >= 0x5000) and (offset < 0x25000) then -- PEC driver rom
-			return pecrom:h(s, t, offset-0x5000, v)
+		elseif (offset >= 0x5000) and (offset < 0x25000) then -- AUC driver rom
+			return aucrom:h(s, t, offset-0x5000, v)
 		elseif (offset >= 0x0FFF00) and (offset < 0x100000) then
 			return curhn(s, t, offset-0x0FFF00, v)
 		elseif (offset >= 0x100000) and (offset < (0x100000 + fbs - 1)) then
