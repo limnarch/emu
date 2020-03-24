@@ -25,7 +25,7 @@ function cpu.new(vm, c)
 
 	local idling = false
 
-	local cpuid = 0x80010000
+	local cpuid = 0x80020000
 
 	local mmu = c.mmu
 	local fetchByte = mmu.fetchByte
@@ -365,14 +365,14 @@ function cpu.new(vm, c)
 		[0x1C] = function (pc) -- [br]
 			return pgReg(fetchByte(pc + 1)), true
 		end,
-		[0x1D] = function (pc) -- [be]
+		[0x1D] = function (pc) -- [be/bz]
 			if getFlag(0) == 1 then
 				return fetchLong(pc + 1), true
 			end
 
 			return pc + 5, true
 		end,
-		[0x1E] = function (pc) -- [bne]
+		[0x1E] = function (pc) -- [bne/bnz]
 			if getFlag(0) == 0 then
 				return fetchLong(pc + 1), true
 			end
@@ -380,28 +380,28 @@ function cpu.new(vm, c)
 			return pc + 5, true
 		end,
 		[0x1F] = function (pc) -- [bg]
-			if getFlag(1) == 1 then
-				return fetchLong(pc + 1), true
-			end
-
-			return pc + 5, true
-		end,
-		[0x20] = function (pc) -- [bl]
 			if (getFlag(1) == 0) and (getFlag(0) == 0) then
 				return fetchLong(pc + 1), true
 			end
 
 			return pc + 5, true
 		end,
-		[0x21] = function (pc) -- [bge]
-			if (getFlag(0) == 1) or (getFlag(1) == 1) then
+		[0x20] = function (pc) -- [bl/bc]
+			if getFlag(1) == 1 then
+				return fetchLong(pc + 1), true
+			end
+
+			return pc + 5, true
+		end,
+		[0x21] = function (pc) -- [bge/bnc]
+			if getFlag(1) == 0 then
 				return fetchLong(pc + 1), true
 			end
 
 			return pc + 5, true
 		end,
 		[0x22] = function (pc) -- [ble]
-			if (getFlag(1) == 0) then
+			if (getFlag(0) == 1) or (getFlag(1) == 1) then
 				return fetchLong(pc + 1), true
 			end
 
@@ -421,7 +421,7 @@ function cpu.new(vm, c)
 		[0x25] = function (pc) -- [cmp]
 			local o1, o2 = pgReg(fetchByte(pc + 1)), pgReg(fetchByte(pc + 2))
 
-			if o1 > o2 then
+			if o1 < o2 then
 				setFlag(1, 1)
 			else
 				setFlag(1, 0)
@@ -438,7 +438,7 @@ function cpu.new(vm, c)
 		[0x26] = function (pc) -- [cmpi]
 			local o1, o2 = pgReg(fetchByte(pc + 1)), fetchLong(pc + 2)
 
-			if o1 > o2 then
+			if o1 < o2 then
 				setFlag(1, 1)
 			else
 				setFlag(1, 0)
@@ -456,22 +456,134 @@ function cpu.new(vm, c)
 		-- arithmetic primitives
 
 		[0x27] = function (pc) -- [add]
-			psReg(fetchByte(pc + 1), pgReg(fetchByte(pc + 2)) + pgReg(fetchByte(pc + 3)))
+			local src1 = pgReg(fetchByte(pc + 2))
+			local src2 = pgReg(fetchByte(pc + 3))
+			local result = src1 + src2
+
+			psReg(fetchByte(pc + 1), result)
+
+			if result == 0 then
+				setFlag(0, 1)
+			else
+				setFlag(0, 0)
+			end
+
+			if result > 0xFFFFFFFF then
+				setFlag(1, 1)
+			else
+				setFlag(1, 0)
+			end
+
+			if band(result, 0x80000000) == 0x80000000 then
+				setFlag(2, 1)
+			else
+				setFlag(2, 0)
+			end
+
+			if (rshift(src1, 31) == rshift(src2, 31)) and (rshift(src1, 31) ~= rshift(result, 31)) then
+				setFlag(3, 1)
+			else
+				setFlag(3, 0)
+			end
 
 			return pc + 4
 		end,
 		[0x28] = function (pc) -- [addi]
-			psReg(fetchByte(pc + 1), pgReg(fetchByte(pc + 2)) + fetchLong(pc + 3))
+			local src1 = pgReg(fetchByte(pc + 2))
+			local src2 = fetchLong(pc + 3)
+			local result = src1 + src2
+
+			psReg(fetchByte(pc + 1), result)
+
+			if result == 0 then
+				setFlag(0, 1)
+			else
+				setFlag(0, 0)
+			end
+
+			if result > 0xFFFFFFFF then
+				setFlag(1, 1)
+			else
+				setFlag(1, 0)
+			end
+
+			if result < 0 then
+				setFlag(2, 1)
+			else
+				setFlag(2, 0)
+			end
+
+			if (band(src1, 0x80000000) == band(src2, 0x80000000)) and (band(src1, 0x80000000) ~= band(result, 0x80000000)) then
+				setFlag(3, 1)
+			else
+				setFlag(3, 0)
+			end
 
 			return pc + 7
 		end,
 		[0x29] = function (pc) -- [sub]
-			psReg(fetchByte(pc + 1), pgReg(fetchByte(pc + 2)) - pgReg(fetchByte(pc + 3)))
+			local src1 = pgReg(fetchByte(pc + 2))
+			local src2 = pgReg(fetchByte(pc + 3))
+			local result = src1 - src2
+
+			psReg(fetchByte(pc + 1), result)
+
+			if result == 0 then
+				setFlag(0, 1)
+			else
+				setFlag(0, 0)
+			end
+
+			if src1 < src2 then
+				setFlag(1, 1)
+			else
+				setFlag(1, 0)
+			end
+
+			if result < 0 then
+				setFlag(2, 1)
+			else
+				setFlag(2, 0)
+			end
+
+			if (band(src1, 0x80000000) == band(src2, 0x80000000)) and (band(src1, 0x80000000) ~= band(result, 0x80000000)) then
+				setFlag(3, 1)
+			else
+				setFlag(3, 0)
+			end
 
 			return pc + 4
 		end,
 		[0x2A] = function (pc) -- [subi]
-			psReg(fetchByte(pc + 1), pgReg(fetchByte(pc + 2)) - fetchLong(pc + 3))
+			local src1 = pgReg(fetchByte(pc + 2))
+			local src2 = fetchLong(pc + 3)
+			local result = src1 - src2
+
+			psReg(fetchByte(pc + 1), result)
+
+			if result == 0 then
+				setFlag(0, 1)
+			else
+				setFlag(0, 0)
+			end
+
+			if src1 < src2 then
+				setFlag(1, 1)
+			else
+				setFlag(1, 0)
+			end
+
+			if result < 0 then
+				setFlag(2, 1)
+			else
+				setFlag(2, 0)
+			end
+
+			if (band(src1, 0x80000000) == band(src2, 0x80000000)) and (band(src1, 0x80000000) ~= band(result, 0x80000000)) then
+				setFlag(3, 1)
+			else
+				setFlag(3, 0)
+			end
 
 			return pc + 7
 		end,
@@ -772,7 +884,7 @@ function cpu.new(vm, c)
 		[0x52] = function (pc) -- [cmps]
 			local o1, o2 = lsign(pgReg(fetchByte(pc + 1))), lsign(pgReg(fetchByte(pc + 2)))
 
-			if o1 > o2 then
+			if o1 < o2 then
 				setFlag(1, 1)
 			else
 				setFlag(1, 0)
@@ -790,7 +902,7 @@ function cpu.new(vm, c)
 		[0x53] = function (pc) -- [cmpsi]
 			local o1, o2 = lsign(pgReg(fetchByte(pc + 1))), lsign(fetchLong(pc + 2))
 
-			if o1 > o2 then
+			if o1 < o2 then
 				setFlag(1, 1)
 			else
 				setFlag(1, 0)
@@ -971,7 +1083,7 @@ function cpu.new(vm, c)
 			if e then
 				reg[32] = e(pc)
 			else
-				--print(string.format("invalid opcode at %X: %d (%s)", pc, fetchByte(pc), string.char(fetchByte(pc))))
+				print(string.format("invalid opcode at %X: %d (%s)", pc, fetchByte(pc), string.char(fetchByte(pc))))
 				fault(1) -- invalid opcode
 			end
 		end
