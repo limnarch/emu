@@ -16,18 +16,18 @@ function block.new(image, blocksize)
 
 	bd.size = bd.file:seek("end")
 
-	bd.blocks = math.floor(bd.size / blocksize)
+	bd.blocks = math.ceil(bd.size / blocksize)
 
 	function bd:seek(block)
 		self.file:seek("set", block * self.bs)
 	end
 
 	function bd:read()
-		return string.byte(self.file:read(1))
+		return string.byte(self.file:read(1) or "\0")
 	end
 
 	function bd:write(byte)
-		self.file:write(string.char(byte))
+		self.file:write(string.char(byte or 0))
 	end
 
 	function bd:readBlock(block)

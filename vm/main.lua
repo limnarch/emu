@@ -2,6 +2,8 @@ block = require("block")
 ffi = require("ffi")
 require("misc")
 
+loff = require("loff")
+
 window = require("ui/window")
 
 --[[

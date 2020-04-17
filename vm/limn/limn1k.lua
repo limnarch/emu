@@ -27,6 +27,9 @@ function cpu.new(vm, c)
 
 	local cpuid = 0x80020000
 
+	p.calltrace = {}
+	local calltrace = p.calltrace
+
 	local mmu = c.mmu
 	local fetchByte = mmu.fetchByte
 	local fetchInt = mmu.fetchInt
@@ -77,6 +80,10 @@ function cpu.new(vm, c)
 				table.remove(fq, 1)
 				sfq = 255
 			end
+
+			p.lastfaultaddr = reg[32]
+
+			p.lastfaultsym,p.lastfaultoff = p.loffsym(reg[32])
 
 			--p.vmerr(string.format("fault %x at %x", num, reg[32]))
 
@@ -210,6 +217,44 @@ function cpu.new(vm, c)
 		end
 	end
 	local pop = p.pop
+
+	p.loffs = {}
+
+	function p.loffsym(address)
+		local r,off
+
+		for k,v in ipairs(p.loffs) do
+			r,off = v:getSym(address)
+
+			if r then
+				return r,off
+			end
+		end
+	end
+
+	local function gsymstr(sym,off)
+		if not sym then return "" end
+
+		return string.format(" %s\n <%s+0x%X>", sym.file, sym.name, off)
+	end
+
+	function p.dumpcalls(max)
+		calltrace[#calltrace + 1] = reg[32]
+
+		for i = 1, math.min(max, #calltrace) do
+			print(string.format("[%d] %x %s", i, calltrace[#calltrace - i + 1], gsymstr(p.loffsym(calltrace[#calltrace - i + 1]))))
+		end
+	end
+
+	vm.registerOpt("-limn1k,loff", function (arg, i)
+		local image = loff.new(arg[i + 1])
+
+		if not image:load() then error("couldn't load image") end
+
+		p.loffs[#p.loffs + 1] = image
+
+		return 2
+	end)
 
 	local qq = false
 
@@ -408,11 +453,15 @@ function cpu.new(vm, c)
 			return pc + 5, true
 		end,
 		[0x23] = function (pc) -- [call]
+			--calltrace[#calltrace + 1] = pc
+
 			push(pc + 5)
 
 			return fetchLong(pc + 1), true
 		end,
 		[0x24] = function (pc) -- [ret]
+			--calltrace[#calltrace] = nil
+
 			return pop()
 		end,
 
@@ -945,20 +994,20 @@ function cpu.new(vm, c)
 			return pc + 1
 		end,
 		[0xF1] = function (pc) -- [] print character in r0
-			io.write(string.char(reg[0]))
+			local c = reg[0]
+
+			if c < 256 then
+				io.write(string.char(reg[0]))
+			else
+				io.write("<"..tostring(reg[0])..">")
+			end
+			
 			io.flush()
 
 			return pc + 1
 		end,
-		[0xF2] = function (pc) -- [] dump last 20 items on stack
-			local osp = reg[33]
-
-			for i = 1, 20 do
-				local osz = reg[33]
-				print(string.format("(%X)[%d]	%X", osz, i, pop()))
-			end
-
-			reg[33] = osp
+		[0xF2] = function (pc) -- [] dump last 20 items on calltrace
+			p.dumpcalls(20)
 
 			return pc + 1
 		end,
@@ -977,6 +1026,15 @@ function cpu.new(vm, c)
 		end,
 		[0xF5] = function (pc) -- [] set qq true
 			qq = true
+
+			return pc + 1
+		end,
+		[0xF6] = function (pc) -- [] dump all registers to terminal if qq set
+			if qq then
+				for i = 0, 41 do
+					print(string.format("%X = %X", i, reg[i]))
+				end
+			end
 
 			return pc + 1
 		end,
@@ -1137,21 +1195,15 @@ function cpu.new(vm, c)
 		"k3",
 	}
 
-	-- called by vm main loop if an error occurs in cpu emulation
+	-- called by vm main loop if an error occurs in cpu emulation, or if im debugging software and want more detailed info on something
 	function p.vmerr(x)
 		local regmnem = p.regmnem
 
 		local es = string.format("=== internal CPU emulation error! ===\n%s\n", x)
 
-		es = es.."\nStack dump for last 20 levels\n"
+		es = es.."\nCall dump for last 20 levels\n"
 
-		local osp = reg[33]
-
-		for i = 1, 20 do
-			es = es..string.format("(%X)[%d]	%X\n", reg[33], i, pop())
-		end
-
-		reg[33] = osp
+		p.dumpcalls(20)
 
 		es = es.."\nCPU STATUS DUMP\n"
 
@@ -1171,19 +1223,36 @@ function cpu.new(vm, c)
 	-- UI stuff
 
 	if vm.window then
-		p.window = vm.window.new("CPU Info", 8*32, 394)
+		p.window = vm.window.new("CPU Info", 10*25, 10*42)
 
 		local function draw(_, dx, dy)
-			for i = 0, 42 do
-				if i < 42 then
-					love.graphics.print(string.format("%s = $%X", p.regmnem[i+1], reg[i]), dx, dy + (i*8))
-				else
-					love.graphics.print(string.format("queue depth = %d", #intq), dx, dy + (i*8))
+			local s = ""
+
+			for i = 0, 41 do
+				s = s .. string.format("%s = $%X", p.regmnem[i+1], reg[i]) .. "\n"
+
+				if i == 32 then
+					local sym,off = p.loffsym(reg[i])
+					if sym then
+						s = s .. gsymstr(sym,off) .. "\n"
+					end
 				end
 			end
+
+			--s = s .. string.format("queue depth = %d", #intq) .. "\n"
+
+			if p.lastfaultaddr then
+				s = s .. string.format("last fault @ 0x%X", p.lastfaultaddr) .. "\n"
+
+				if p.lastfaultsym then
+					s = s .. gsymstr(p.lastfaultsym,p.lastfaultoff) .. "\n"
+				end
+			end
+
+			love.graphics.print(s, dx, dy)
 		end
 
-		local wc = p.window:addElement(window.canvas(p.window, draw, 8*32, 384))
+		local wc = p.window:addElement(window.canvas(p.window, draw, p.window.w, p.window.h))
 		wc.x = 0
 		wc.y = 20
 
@@ -1201,6 +1270,8 @@ function cpu.new(vm, c)
 				reset()
 			end
 		end
+
+		--p.window.open(p.window)
 	end
 
 	return p
