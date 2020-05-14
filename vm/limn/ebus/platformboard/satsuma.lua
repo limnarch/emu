@@ -50,14 +50,14 @@ function ahdb.new(vm, c, bus)
 	local busy = 0
 	local busyw
 
-	local int = c.cpu.int
+	local int = c.int
 
 	b.buffer = ffi.new("uint8_t[4096]")
 	local buffer = b.buffer
 
 	function b.handler(s, t, offset, v)
 		if offset >= 4096 then
-			return 0
+			return false
 		end
 
 		if t == 0 then
@@ -89,6 +89,8 @@ function ahdb.new(vm, c, bus)
 				buffer[offset+3] = u1 -- little endian
 			end
 		end
+
+		return true
 	end
 
 	function b.attach(mask) -- attach drive
@@ -146,7 +148,7 @@ function ahdb.new(vm, c, bus)
 		infodetails = details
 
 		if doint then
-			int(0x20)
+			int(0x2)
 		end
 	end
 
@@ -250,6 +252,8 @@ function ahdb.new(vm, c, bus)
 				doint = false
 			end
 		end
+
+		return true
 	end)
 
 	bus.addPort(0x1A, function (s, t, v)
@@ -258,6 +262,8 @@ function ahdb.new(vm, c, bus)
 		else
 			port19 = v
 		end
+
+		return true
 	end)
 
 	bus.addPort(0x1B, function (s, t, v)
@@ -266,6 +272,8 @@ function ahdb.new(vm, c, bus)
 		else
 			port1A = v
 		end
+
+		return true
 	end)
 
 	function b.reset()

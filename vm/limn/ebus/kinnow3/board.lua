@@ -67,7 +67,7 @@ function gpu.new(vm, c, page, intn)
 	local log = vm.log.log
 
 	local function int()
-		c.cpu.int(intn)
+		c.int(intn)
 	end
 
 	g.height = 768
@@ -322,6 +322,8 @@ function gpu.new(vm, c, page, intn)
 				action(s, offset, v, 0)
 			end
 		end
+
+		return true
 	end
 
 	local function curhn(s, t, offset, v)
@@ -511,7 +513,7 @@ function gpu.new(vm, c, page, intn)
 		if not enabled then return 0 end
 
 		if s ~= 0 then
-			return 0
+			return false
 		end
 
 		if t == 1 then
@@ -621,6 +623,8 @@ function gpu.new(vm, c, page, intn)
 		else
 			return 0
 		end
+
+		return true
 	end
 
 	local k2lt = {
@@ -686,8 +690,10 @@ function gpu.new(vm, c, page, intn)
 		elseif (offset >= 0x100000) and (offset < (0x100000 + fbs - 1)) then
 			return gpuh(s, t, offset-0x100000, v)
 		else
-			return 0
+			return false
 		end
+
+		return true
 	end
 
 	function g.reset()

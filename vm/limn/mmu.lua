@@ -16,40 +16,20 @@ function mmu.new(vm, c)
 
 	local bus = c.bus
 
-	local TfetchByte = bus.fetchByte
-	local TfetchInt = bus.fetchInt
-	local TfetchLong = bus.fetchLong
-	local TstoreByte = bus.storeByte
-	local TstoreInt = bus.storeInt
-	local TstoreLong = bus.storeLong
+	m.TfetchByte = bus.fetchByte
+	m.TfetchInt = bus.fetchInt
+	m.TfetchLong = bus.fetchLong
+	m.TstoreByte = bus.storeByte
+	m.TstoreInt = bus.storeInt
+	m.TstoreLong = bus.storeLong
 
-	function m.TfetchByte(ptr)
-		return TfetchByte()
-	end
+	local TfetchByte = m.TfetchByte
+	local TfetchInt = m.TfetchInt
+	local TfetchLong = m.TfetchLong
 
-	function m.TfetchInt(ptr)
-		return TfetchInt(ptr)
-	end
-
-	function m.TfetchLong(ptr)
-		return TfetchLong(ptr)
-	end
-
-	--[[
-		Store versions of the above.
-	]]
-
-	function m.TstoreByte(ptr, v)
-		TstoreByte(ptr, v)
-	end
-
-	function m.TstoreInt(ptr, v)
-		TstoreInt(ptr, v)
-	end
-
-	function m.TstoreLong(ptr, v)
-		TstoreLong(ptr, v)
-	end
+	local TstoreByte = m.TstoreByte
+	local TstoreInt = m.TstoreInt
+	local TstoreLong = m.TstoreLong
 
 	-- mmu registers
 
@@ -84,16 +64,16 @@ function mmu.new(vm, c)
 
 	local function translate(ptr, size)
 		for segment = 0, 3 do
-			local segsize = registers[segment * 3 + 5 + 1]
+			local segsize = registers[segment * 3 + 5 + 1]*4096
 
 			if segsize ~= 0 then
-				local mapaddr = registers[segment * 3 + 5 + 2]
+				local mapaddr = registers[segment * 3 + 5 + 2]*4096
 
 				local segtop = mapaddr + segsize - 1
 				local valtop = ptr + size - 1
 
 				if (ptr >= mapaddr) and (valtop <= segtop) then -- in this segment
-					local realaddr = registers[segment * 3 + 5 + 0]
+					local realaddr = registers[segment * 3 + 5 + 0]*4096
 
 					return (ptr - mapaddr) + realaddr
 				end
@@ -103,21 +83,35 @@ function mmu.new(vm, c)
 		-- not in a segment
 
 		registers[4] = ptr
-		c.cpu.pagefault()
-		return 0
+		c.cpu.pagefault(ptr)
+		return false
+	end
+
+	function m.translate(ptr, size)
+		if not m.translating then return ptr end
+
+		return translate(ptr, size)
 	end
 
 	function m.fetchByte(ptr)
 		if not m.translating then return TfetchByte(ptr) end
 
-		return TfetchByte(translate(ptr, 1))
+		local v = translate(ptr, 1)
+
+		if v then
+			return TfetchByte(v)
+		end
 	end
 	local fetchByte = m.fetchByte
 
 	function m.fetchInt(ptr)
 		if not m.translating then return TfetchInt(ptr) end
 
-		return TfetchInt(translate(ptr, 2))
+		local v = translate(ptr, 2)
+
+		if v then
+			return TfetchInt(v)
+		end
 	end
 	local fetchInt = m.fetchInt
 
@@ -133,7 +127,11 @@ function mmu.new(vm, c)
 			return TfetchLong(ptr)
 		end
 
-		return TfetchLong(translate(ptr, 4))
+		local v = translate(ptr, 4)
+
+		if v then
+			return TfetchLong(v)
+		end
 	end
 	local fetchLong = m.fetchLong
 
@@ -141,14 +139,22 @@ function mmu.new(vm, c)
 	function m.storeByte(ptr, v)
 		if not m.translating then return TstoreByte(ptr, v) end
 
-		return TstoreByte(translate(ptr, 1), v)
+		local ta = translate(ptr, 1)
+
+		if ta then
+			return TstoreByte(ta, v)
+		end
 	end
 	local storeByte = m.storeByte
 
 	function m.storeInt(ptr, v)
 		if not m.translating then return TstoreInt(ptr, v) end
 
-		return TstoreInt(translate(ptr, 2), v)
+		local ta = translate(ptr, 2)
+
+		if ta then
+			return TstoreInt(ta, v)
+		end
 	end
 	local storeInt = m.storeInt
 
@@ -165,7 +171,11 @@ function mmu.new(vm, c)
 			return TstoreLong(ptr, v)
 		end
 
-		return TstoreLong(translate(ptr, 4), v)
+		local ta = translate(ptr, 4)
+
+		if ta then
+			return TstoreLong(ta, v)
+		end
 	end
 	local storeLong = m.storeLong
 

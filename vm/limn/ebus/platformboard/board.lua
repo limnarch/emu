@@ -1,11 +1,11 @@
 -- platform board
--- pretty much the entire pre-ebus motherboard shoved onto a ebus board
--- it's a glue hack and this code is really ugly :(
 
 -- slot space:
 -- 0000000-00003FF: citron bus ports
 -- 0000800-0000FFF: platformboard info
 -- 0001000-0010FFF: NVRAM
+-- 0020000-0021000: dks block buffer
+-- 0030000-0x300FF: LSIC registers
 -- 7FE0000-FFFFFFF: boot ROM
 
 local pboard = {}
@@ -21,6 +21,9 @@ function pboard.new(vm, c, branch, intn)
 
 	-- deeply ugly code here
 
+	pb.lsic = require("limn/ebus/platformboard/lsic").new(vm, c)
+	local lsic = pb.lsic
+	local lsich = lsic.lsich
 
 	pb.bootrom = require("limn/ebus/platformboard/bootrom").new(vm, c)
 	local bootrom = pb.bootrom
@@ -70,6 +73,8 @@ function pboard.new(vm, c, branch, intn)
 		else
 			return 0
 		end
+
+		return true
 	end
 
 	function pb.handler(s, t, offset, v)
@@ -83,9 +88,10 @@ function pboard.new(vm, c, branch, intn)
 			return pbh(s, t, offset - 0x800, v)
 		elseif (offset >= 0x20000) and (offset < 0x21000) then -- satsuma buffer
 			return satsumah(s, t, offset - 0x20000, v)
+		elseif (offset >= 0x30000) and (offset < 0x30100) then -- LSIC registers
+			return lsich(s, t, offset - 0x30000, v)
 		else
-			c.cpu.buserror()
-			return 0
+			return false
 		end
 	end
 
@@ -94,6 +100,7 @@ function pboard.new(vm, c, branch, intn)
 		pb.serial.reset()
 		satsuma.reset()
 		amtsu.reset()
+		lsic.reset()
 	end
 
 	vm.registerOpt("-keyboard", function (arg, i)

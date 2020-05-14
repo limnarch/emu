@@ -1,5 +1,16 @@
 local loff = {}
 
+loff.archinfo = {}
+local archinfo = loff.archinfo
+
+archinfo[1] = {}
+archinfo[1].name = "limn1k"
+archinfo[1].align = 1
+
+archinfo[2] = {}
+archinfo[2].name = "limn2k"
+archinfo[2].align = 4
+
 local loffheader_s = struct({
 	{4, "magic"},
 	{4, "symbolTableOffset"},
@@ -33,7 +44,8 @@ local symbol_s = struct({
 local fixup_s = struct({
 	{4, "symbolIndex"},
 	{4, "offset"},
-	{4, "size"}
+	{4, "size"},
+	{4, "divisor"},
 })
 
 local uint32_s = struct {
@@ -113,6 +125,8 @@ function loff.new(filename)
 
 		self.codeType = self.header.gv("targetArchitecture")
 
+		self.archinfo = archinfo[self.codeType]
+
 		local stripped = self.header.gv("stripped")
 
 		if stripped == 1 then
@@ -153,8 +167,6 @@ function loff.new(filename)
 
 			symt.section = sym.gv("section")
 
-			symt.sectiont = self.sections[symt.section]
-
 			if symt.section > 3 then
 				print(string.format("objtool: '%s' section # > 3"), self.path)
 				return false
@@ -165,6 +177,8 @@ function loff.new(filename)
 			symt.name = name
 
 			symt.file = self.path
+
+			symt.sectiont = self.sections[symt.section]
 
 			self.symbols[i-1] = symt
 
@@ -237,6 +251,8 @@ function loff.new(filename)
 
 						f.size = fent.gv("size")
 
+						f.divisor = fent.gv("divisor")
+
 						f.file = self.path
 					end
 				end
@@ -249,6 +265,11 @@ function loff.new(filename)
 				return false
 			end
 
+			if self.archinfo and (address % self.archinfo.align ~= 0) then
+				print(string.format("objtool: %s requires section addresses to be aligned to a boundary of %d bytes", self.archinfo.name, self.archinfo.align))
+				return false
+			end
+
 			local s = self.sections[section]
 
 			for k,v in ipairs(s.fixups) do
@@ -256,7 +277,7 @@ function loff.new(filename)
 					if v.size <= 8 then
 						local type_s = struct({{v.size, "value"}})
 						local addrs = cast(type_s, s.contents, v.offset)
-						addrs.sv("value", addrs.gv("value") - s.linkedAddress + address)
+						addrs.sv("value", ((addrs.gv("value") * v.divisor) - s.linkedAddress + address) / v.divisor)
 					end
 				end
 			end
@@ -279,12 +300,12 @@ function loff.new(filename)
 									if sym.value == 1 then
 										addrs.sv("value", s.linkedAddress)
 									elseif sym.value == 2 then
-										addrs.sv("value", s.size)
+										addrs.sv("value", math.floor(s.size / v.divisor))
 									elseif sym.value == 3 then
-										addrs.sv("value", s.linkedAddress + s.size)
+										addrs.sv("value", (s.linkedAddress + s.size) / v.divisor)
 									end
 								else
-									addrs.sv("value", sym.value + s.linkedAddress)
+									addrs.sv("value", (sym.value + s.linkedAddress) / v.divisor)
 								end
 							end
 						end
@@ -391,6 +412,7 @@ function loff.new(filename)
 							if address >= (sym.value + s.linkedAddress) then
 								thesym = sym
 							elseif address < (sym.value + s.linkedAddress) then
+								if not thesym then return end
 								return thesym, address - (thesym.value + s.linkedAddress)
 							end
 						end
@@ -470,7 +492,7 @@ function loff.new(filename)
 			es.index = addSymbol(es.name, es.section, es.symtype, es.value)
 		end
 
-		local function addFixup(section, symindex, offset, size)
+		local function addFixup(section, symindex, offset, size, divisor)
 			local u1, u2, u3, u4 = splitInt32(symindex)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
@@ -478,6 +500,9 @@ function loff.new(filename)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 			u1, u2, u3, u4 = splitInt32(size)
+			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			u1, u2, u3, u4 = splitInt32(divisor)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		end
 
@@ -495,7 +520,7 @@ function loff.new(filename)
 						sindex = v.symbol.index
 					end
 
-					addFixup(s, sindex, v.offset, v.size)
+					addFixup(s, sindex, v.offset, v.size, v.divisor)
 
 					s.fixupcount = s.fixupcount + 1
 				end
@@ -693,7 +718,7 @@ function loff.new(filename)
 					if v.size <= 8 then
 						local type_s = struct({{v.size, "value"}})
 						local addrs = cast(type_s, mysection.contents, v.offset)
-						addrs.sv("value", sym.resolved.value)
+						addrs.sv("value", (sym.resolved.value / v.divisor))
 					else
 						--print("didnt resolve")
 					end

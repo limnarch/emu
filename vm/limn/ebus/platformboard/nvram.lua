@@ -12,7 +12,7 @@ function nvram.new(vm, c)
 
 	function nr.handler(s, t, offset, v)
 		if offset >= 64*1024 then
-			return 0
+			return false
 		end
 
 		if t == 0 then
@@ -54,6 +54,8 @@ function nvram.new(vm, c)
 				sm[offset+3] = u1 -- little endian
 			end
 		end
+
+		return true
 	end
 
 	nr.nvramfile = false

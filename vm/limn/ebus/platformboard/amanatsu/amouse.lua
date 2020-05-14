@@ -20,7 +20,7 @@ function mouse.new(vm, c)
 
 	local ifs = {}
 
-	local cint = c.cpu.int
+	local cint = c.int
 
 	local function int()
 		if m.intn then
@@ -56,6 +56,8 @@ function mouse.new(vm, c)
 			adx = 0
 			ady = 0
 		end
+
+		return true
 	end
 
 	if c.window then

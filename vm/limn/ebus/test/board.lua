@@ -41,6 +41,8 @@ function test.new(vm, c, page, intn)
 		else
 			return 0
 		end
+
+		return true
 	end
 
 	return tb

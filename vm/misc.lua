@@ -29,10 +29,57 @@ end
 
 function lsign(v)
 	if getBit(v, 31) == 1 then
-		return -(bnot(v)+1)
+		return -(band(bnot(v)+1, 0xFFFFFFFF))
 	else
 		return v
 	end
+end
+
+function tsign(v)
+    if getBit(v, 23) == 1 then
+        return -(band(bnot(v)+1, 0xFFFFFF))
+    else
+        return v
+    end
+end
+
+function isign(v)
+    if getBit(v, 15) == 1 then
+        return -(band(bnot(v)+1, 0xFFFF))
+    else
+        return v
+    end
+end
+
+function bsign(v)
+    if getBit(v, 7) == 1 then
+        return -(band(bnot(v)+1, 0xFF))
+    else
+        return v
+    end
+end
+
+function tensign(v) -- 10 bit offsets for limn2k
+    if getBit(v, 9) == 1 then
+        return -(band(bnot(v)+1, 0x3FF))
+    else
+        return v
+    end
+end
+
+function twsxsign(v) -- 26 bit offsets for limn2k
+    if getBit(v, 25) == 1 then
+        return -(band(bnot(v)+1, 0x3FFFFFF))
+    else
+        return v
+    end
+end
+
+function bswap(v)
+    return  bor(rshift(v, 24),
+            bor(band(lshift(v, 8), 0xFF0000),
+                bor(band(rshift(v, 8), 0xFF00),
+                        band(lshift(v, 24), 0xFF000000))))
 end
 
 function toInt32(byte4, byte3, byte2, byte1)

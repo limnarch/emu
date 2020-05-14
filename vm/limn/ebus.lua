@@ -2,7 +2,7 @@
 
 local bus = {}
 
-function bus.new(vm, c)
+function bus.new(vm, c, aligned)
 	local b = {}
 
 	local log = vm.log.log
@@ -28,9 +28,7 @@ function bus.new(vm, c)
 	--t = 1: write, v = value
 
 	local function buserrorh(s, t, offset, v)
-		c.cpu.buserror()
-
-		return 0
+		return false
 	end
 
 	function b.mapArea(page, handler)
@@ -44,7 +42,7 @@ function bus.new(vm, c)
 	function b.insertBoard(page, board, ...)
 		log("[ebus] inserting board "..board.." in branch "..tostring(page))
 
-		local board = require("limn/ebus/"..board.."/board").new(vm, c, page, 0x80 + page, ...)
+		local board = require("limn/ebus/"..board.."/board").new(vm, c, page, 0x20 + page, ...)
 
 		b.mapArea(page, board.handler)
 
@@ -71,19 +69,47 @@ function bus.new(vm, c)
 	function b.fetchByte(ptr)
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		return areah[rshift(ptr, 27)](0, 0, band(ptr, 0x7FFFFFF))
+		local r = areah[rshift(ptr, 27)](0, 0, band(ptr, 0x7FFFFFF))
+
+		if not r then
+			c.cpu.buserror(ptr)
+		end
+
+		return r
 	end
 
 	function b.fetchInt(ptr)
+		if aligned and (band(ptr, 1) ~= 0) then
+			c.cpu.unaligned(ptr)
+			return false
+		end
+
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		return areah[rshift(ptr, 27)](1, 0, band(ptr, 0x7FFFFFF))
+		local r = areah[rshift(ptr, 27)](1, 0, band(ptr, 0x7FFFFFF))
+
+		if not r then
+			c.cpu.buserror(ptr)
+		end
+
+		return r
 	end
 
 	function b.fetchLong(ptr)
+		if aligned and (band(ptr, 3) ~= 0) then
+			c.cpu.unaligned(ptr)
+			return false
+		end
+
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		return areah[rshift(ptr, 27)](2, 0, band(ptr, 0x7FFFFFF))
+		local r = areah[rshift(ptr, 27)](2, 0, band(ptr, 0x7FFFFFF))
+
+		if not r then
+			c.cpu.buserror(ptr)
+		end
+
+		return r
 	end
 
 	--[[
@@ -93,19 +119,44 @@ function bus.new(vm, c)
 	function b.storeByte(ptr, v)
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		areah[rshift(ptr, 27)](0, 1, band(ptr, 0x7FFFFFF), v)
+		if not areah[rshift(ptr, 27)](0, 1, band(ptr, 0x7FFFFFF), v) then
+			c.cpu.buserror(ptr)
+			return false
+		end
+
+		return true
 	end
 
 	function b.storeInt(ptr, v)
+		if aligned and (band(ptr, 1) ~= 0) then
+			c.cpu.unaligned(ptr)
+			return false
+		end
+
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		areah[rshift(ptr, 27)](1, 1, band(ptr, 0x7FFFFFF), v)
+		if not areah[rshift(ptr, 27)](1, 1, band(ptr, 0x7FFFFFF), v) then
+			c.cpu.buserror(ptr)
+			return false
+		end
+
+		return true
 	end
 
 	function b.storeLong(ptr, v)
+		if aligned and (band(ptr, 3) ~= 0) then
+			c.cpu.unaligned(ptr)
+			return false
+		end
+
 		ptr = band(ptr, 0xFFFFFFFF)
 
-		areah[rshift(ptr, 27)](2, 1, band(ptr, 0x7FFFFFF), v)
+		if not areah[rshift(ptr, 27)](2, 1, band(ptr, 0x7FFFFFF), v) then
+			c.cpu.buserror(ptr)
+			return false
+		end
+
+		return true
 	end
 
 	for i = 0, 23 do
@@ -167,7 +218,7 @@ function bus.new(vm, c)
 
 		function rom:h(s, t, offset, v)
 			if offset >= 128*1024 then
-				return 0
+				return false
 			end
 
 			if t == 0 then

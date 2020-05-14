@@ -10,7 +10,7 @@ function cdev.new(vm, c, bus)
 	cl.msr = 0
 	cl.tc = 0
 
-	local int = c.cpu.int
+	local int = c.int
 
 	local epoch = os.time(os.date("!*t"))
 	local et = love.timer.getTime()
@@ -20,7 +20,7 @@ function cdev.new(vm, c, bus)
 			cl.tc = cl.tc + dt
 			while cl.tc > cl.msr do
 				cl.tc = cl.tc - cl.msr
-				int(0x22)
+				int(0x1)
 			end
 		end
 	end)
@@ -46,6 +46,8 @@ function cdev.new(vm, c, bus)
 		else
 			return 0
 		end
+
+		return true
 	end)
 
 	bus.addPort(0x21, function (s, t, v)
@@ -54,6 +56,8 @@ function cdev.new(vm, c, bus)
 		else
 			portA = v
 		end
+
+		return true
 	end)
 
 	function cl.reset()

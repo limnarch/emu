@@ -8,9 +8,9 @@ function computer.new(vm, memsize)
 	end
 
 	-- chipset
-	c.bus = require("limn/ebus").new(vm, c)
+	c.bus = require("limn/ebus").new(vm, c, true)
 	c.mmu = require("limn/mmu").new(vm, c)
-	c.cpu = require("limn/limn1k").new(vm, c)
+	c.cpu = require("limn/limn2k").new(vm, c)
 
 	c.bus.insertBoard(31, "platformboard")
 	c.bus.insertBoard(0, "ram256", memsize) -- virtual board for RAM

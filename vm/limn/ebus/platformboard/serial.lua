@@ -27,7 +27,7 @@ function serial.new(vm, c, bus)
 
 	local port11 = 0xFFFF
 
-	local int = c.cpu.int
+	local int = c.int
 
 	local iq = {}
 	local oq = {}
@@ -66,6 +66,8 @@ function serial.new(vm, c, bus)
 		else
 			return 0 -- always idle since this is all synchronous (god bless emulators)
 		end
+
+		return true
 	end)
 
 	bus.addPort(0x11, function (s,t,v)
@@ -80,6 +82,8 @@ function serial.new(vm, c, bus)
 				return port11
 			end
 		end
+
+		return true
 	end)
 
 	function s.stream(e)

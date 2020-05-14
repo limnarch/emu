@@ -34,6 +34,8 @@ function pbus.new(vm, c, b)
 		else
 			return 0
 		end
+
+		return true
 	end)
 
 	b.addPort(0x31, function (s, t, v)
@@ -48,6 +50,8 @@ function pbus.new(vm, c, b)
 				return 0
 			end
 		end
+
+		return true
 	end)
 
 	b.addPort(0x32, function (s, t, v)
@@ -55,9 +59,11 @@ function pbus.new(vm, c, b)
 			return 0
 		else
 			if sdev then
-				sdev.action(v)
+				return sdev.action(v)
 			end
 		end
+
+		return false
 	end)
 
 	b.addPort(0x33, function (s, t, v)
@@ -65,13 +71,15 @@ function pbus.new(vm, c, b)
 			if sdev then
 				return sdev.portA
 			else
-				return 0
+				return false
 			end
 		else
 			if sdev then
 				sdev.portA = v
 			end
 		end
+
+		return true
 	end)
 
 	b.addPort(0x34, function (s, t, v)
@@ -79,17 +87,19 @@ function pbus.new(vm, c, b)
 			if sdev then
 				return sdev.portB
 			else
-				return 0
+				return false
 			end
 		else
 			if sdev then
 				sdev.portB = v
 			end
 		end
+
+		return true
 	end)
 
 	function a.addDevice(d)
-		if ln > 255 then return false end
+		if ln > 15 then return false end
 
 		dev[ln] = d
 
@@ -102,22 +112,26 @@ function pbus.new(vm, c, b)
 	bcon.portA = 0
 	bcon.portB = 0
 	function bcon.action(v)
-		if v == 1 then -- map interrupt num portA to device portB
-			--print(string.format("int %d to dev %d", bcon.portA, bcon.portB))
+		if v == 1 then -- enable interrupts on device
 			if dev[bcon.portB] then
-				dev[bcon.portB].intn = bcon.portA
+				dev[bcon.portB].intn = 4 + bcon.portB
 			end
 		elseif v == 2 then -- reset
 			a.reset()
+		elseif v == 3 then -- disable interrupts on device
+			if dev[bcon.portB] then
+				dev[bcon.portB].intn = nil
+			end
 		end
+
+		return true
 	end
 
 	dev[0] = bcon
 
 	function a.reset()
-		for i = 1, 255 do
+		for i = 1, 15 do
 			if dev[i] then
-				dev[i].intn = nil
 				dev[i].reset()
 			end
 		end

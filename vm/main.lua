@@ -19,7 +19,7 @@ vm.window = window
 
 vm.speed = 1
 
-vm.hz = 6000000
+vm.hz = 10000000
 vm.targetfps = 60
 vm.instructionsPerTick = 0
 
@@ -64,7 +64,7 @@ function love.load(arg)
 		window.init()
 	end
 
-	vm.computer = require("computer").new(vm, 1024*1024*32) -- new computer with 32mb of mem
+	vm.computer = require("computer").new(vm, 32*1024*1024) -- new computer with 32mb of mem
 
 	local i = 1
 	while true do
@@ -96,7 +96,7 @@ function love.load(arg)
 		end
 	end
 
-	vm.instructionsPerTick = vm.hz / vm.targetfps
+	vm.instructionsPerTick = math.ceil(vm.hz / vm.targetfps)
 
 	love.keyboard.setKeyRepeat(true)
 
@@ -113,14 +113,27 @@ end
 
 local cycles = 0
 local ct = 0
+local usedt = 0
+
+local timesran = 0
 
 function love.update(dt)
+	timesran = timesran + 1
+
 	ct = ct + dt
 
-	if (ct > 1) and (dbmsg) then
-		print(cycles)
+	if (ct > 1) then
+		if dbmsg then
+			print(vm.hz, cycles, timesran)
+			print("used "..tostring(usedt * 100).."% of time")
+			print(vm.computer.cpu.killedblocks)
+			vm.computer.cpu.killedblocks = 0
+		end
+
 		cycles = 0
 		ct = 0
+		usedt = 0
+		timesran = 0
 	end
 
 	local vct = vm.cb.update
@@ -142,13 +155,24 @@ function love.update(dt)
 		end
 	end
 
-	local cycle = vm.computer.cpu.cycle
+	if cycles < vm.hz then
+		local cycle = vm.computer.cpu.cycle
 
-	local t = vm.instructionsPerTick
+		local t = vm.instructionsPerTick
+
+		cycles = cycles + cycle(t)
+
+		usedt = usedt + dt
+	end
+
+	--print(collectgarbage("count"))
+
+	--[[
 	for i = 1, t do
 		cycle()
 		cycles = cycles + 1
 	end
+	]]
 end
 
 function love.draw()

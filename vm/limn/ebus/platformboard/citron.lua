@@ -24,11 +24,11 @@ function bus.new(vm, c)
 
 	function b.bush(s, t, offset, v)
 		if offset >= 1024 then
-			return 0
+			return false
 		end
 
 		if band(offset, 3) ~= 0 then -- must be aligned to 4 bytes
-			return 0
+			return false
 		end
 
 		local port = offset/4
@@ -37,7 +37,7 @@ function bus.new(vm, c)
 		if h then
 			return h(s, t, v)
 		else
-			return 0
+			return false
 		end
 	end
 

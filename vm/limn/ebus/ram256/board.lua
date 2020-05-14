@@ -11,10 +11,11 @@ function ram256.new(vm, c, branch, intn, memsize)
 	ram.physmem = ffi.new("uint8_t[?]", memsize)
 	local physmem = ram.physmem
 
+	c.bus.ram = physmem
+
 	function ram.handler(s, t, offset, v)
 		if offset >= memsize then
-			c.cpu.buserror()
-			return 0
+			return false
 		end
 
 		if s == 0 then -- byte
@@ -48,6 +49,8 @@ function ram256.new(vm, c, branch, intn, memsize)
 				physmem[offset+3] = u1 -- little endian
 			end
 		end
+
+		return true
 	end
 	local rhandler = ram.handler
 

@@ -34,6 +34,8 @@ function dmacon.new(vm, c, branch, intn, memsize)
 		local srcmod = registers[9]
 
 		for line = 0, lines - 1 do
+			local odest = dest
+
 			for i = 0, count - 1 do
 				writeByte(dest, readByte(source))
 
@@ -57,6 +59,8 @@ function dmacon.new(vm, c, branch, intn, memsize)
 		local srcmod = registers[9]
 
 		for line = 0, lines - 1 do
+			local odest = dest
+
 			for i = 0, count - 1 do
 				writeInt(dest, readInt(source))
 
@@ -80,6 +84,8 @@ function dmacon.new(vm, c, branch, intn, memsize)
 		local srcmod = registers[9]
 
 		for line = 0, lines - 1 do
+			local odest = dest
+
 			for i = 0, count - 1 do
 				writeLong(dest, readLong(source))
 
@@ -111,11 +117,11 @@ function dmacon.new(vm, c, branch, intn, memsize)
 
 	function dma.handler(s, t, offset, v)
 		if band(offset, 3) ~= 0 then -- must be aligned to 4 bytes
-			return 0
+			return false
 		end
 
 		if s ~= 2 then -- must be a 32-bit access
-			return 0
+			return false
 		end
 
 		if t == 0 then
@@ -131,12 +137,14 @@ function dmacon.new(vm, c, branch, intn, memsize)
 				--busyw = vm.registerTimed(registers[4]*0.0000002, function ()
 					op()
 					if getBit(registers[6], 1) == 1 then
-						c.cpu.int(intn)
+						c.int(intn)
 					end
 					registers[6] = setBit(registers[6], 0, 0)
 				--end)
 			end
 		end
+
+		return true
 	end
 
 	function dma.reset()

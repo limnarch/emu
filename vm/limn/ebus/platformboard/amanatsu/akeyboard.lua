@@ -80,7 +80,7 @@ function keydev.new(vm, c)
 
 	kbd.mid = 0x8FC48FC4
 
-	local cint = c.cpu.int
+	local cint = c.int
 
 	local function int()
 		if kbd.intn then
@@ -123,6 +123,8 @@ function keydev.new(vm, c)
 				kbd.portA = 0x0
 			end
 		end
+
+		return true
 	end
 
 	if c.window then

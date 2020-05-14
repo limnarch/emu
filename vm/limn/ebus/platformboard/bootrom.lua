@@ -24,6 +24,8 @@ function rom.new(vm, c)
 				return (u4 * 0x1000000) + (u3 * 0x10000) + (u2 * 0x100) + u1
 			end
 		end
+
+		return false
 	end
 
 	vm.registerOpt("-rom", function (arg, i)
