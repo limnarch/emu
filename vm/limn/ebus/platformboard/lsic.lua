@@ -7,7 +7,7 @@ function ic.new(vm, c)
 
 	local cnr = ffi.new("uint32_t[5]")
 
-	local cpuint = c.cpu.interrupt
+	cn.interrupting = false
 
 	function cn.int(src)
 		if (src > 63) or (src == 0) then
@@ -18,7 +18,7 @@ function ic.new(vm, c)
 
 		cnr[r] = setBit(cnr[r], src % 32, 1)
 
-		cpuint()
+		cn.interrupting = true
 	end
 	c.int = cn.int -- set computer's interrupt function to mine
 
@@ -57,6 +57,10 @@ function ic.new(vm, c)
 				local rg = math.floor(v/32) + 2
 
 				cnr[rg] = setBit(cnr[rg], v % 32, 0)
+
+				if (cnr[2] == 0) and (cnr[3] == 0) then
+					cn.interrupting = false
+				end
 			end
 		else
 			return false -- not implemented
@@ -71,6 +75,8 @@ function ic.new(vm, c)
 		cnr[2] = 0
 		cnr[3] = 0
 		cnr[4] = 0
+
+		cn.interrupting = false
 	end
 
 	return cn

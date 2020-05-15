@@ -41,6 +41,8 @@ function cpu.new(vm, c)
 
 	local running = true
 
+	local timer = false
+
 	local calltrace = {}
 
 	p.regs = ffi.new("uint32_t[44]")
@@ -105,6 +107,14 @@ function cpu.new(vm, c)
 
 		if getBit(s, 2) == 1 then
 			mmu.translating = true
+		else
+			mmu.translating = false
+		end
+
+		if getBit(s, 3) == 1 then
+			timer = true
+		else
+			timer = false
 		end
 
 		r[36] = band(s, 0x7FFFFFFF)
@@ -635,7 +645,7 @@ function cpu.new(vm, c)
 			end
 		end,
 
-		[0x29] = function (addr, inst) -- [bgt]
+		[0x29] = function (addr, inst) -- [blt.s]
 			local dest = band(inst, 0xFF)
 			local src1 = band(rshift(inst, 8), 0xFF)
 			local src2 = band(rshift(inst, 16), 0xFF)
@@ -645,7 +655,7 @@ function cpu.new(vm, c)
 				return
 			end
 
-			if r[dest] > r[src1] then
+			if lg(r[dest]) < lg(r[src1]) then
 				return addr + tg(lshift(src2, 2))
 			end
 		end,
@@ -682,7 +692,7 @@ function cpu.new(vm, c)
 			end
 		end,
 
-		[0x2E] = function (addr, inst) -- [sgt]
+		[0x2C] = function (addr, inst) -- [slt.s]
 			local dest = band(inst, 0xFF)
 			local src1 = band(rshift(inst, 8), 0xFF)
 			local src2 = band(rshift(inst, 16), 0xFF)
@@ -692,12 +702,28 @@ function cpu.new(vm, c)
 				return
 			end
 
-			if r[src1] > r[src2] then
+			if lg(r[src1]) < lg(r[src2]) then
 				r[dest] = 1
 			else
 				r[dest] = 0
 			end
 		end,
+		[0x2D] = function (addr, inst) -- [slti.s]
+			local dest = band(inst, 0xFF)
+			local src1 = band(rshift(inst, 8), 0xFFFF)
+
+			if (not accessdest(dest)) then
+				exception(8)
+				return
+			end
+
+			if lg(r[dest]) < src1 then
+				r[dest] = 1
+			else
+				r[dest] = 0
+			end
+		end,
+
 		[0x2F] = function (addr, inst) -- [sgti]
 			local dest = band(inst, 0xFF)
 			local src1 = band(rshift(inst, 8), 0xFFFF)
@@ -708,6 +734,22 @@ function cpu.new(vm, c)
 			end
 
 			if r[dest] > src1 then
+				r[dest] = 1
+			else
+				r[dest] = 0
+			end
+		end,
+
+		[0x30] = function (addr, inst) -- [sgti.s]
+			local dest = band(inst, 0xFF)
+			local src1 = band(rshift(inst, 8), 0xFFFF)
+
+			if (not accessdest(dest)) then
+				exception(8)
+				return
+			end
+
+			if lg(r[dest]) > src1 then
 				r[dest] = 1
 			else
 				r[dest] = 0
@@ -1356,19 +1398,16 @@ function cpu.new(vm, c)
 		end,
 	}
 
-	local pendinginterrupt = false
+	local intc
 
 	function p.reset()
+		intc = c.intc
+
 		r[37] = 0
 		fillState(0)
 		r[31] = TfL(0xFFFE0000)
 
 		currentexception = nil
-		pendinginterrupt = false
-	end
-
-	function p.interrupt()
-		pendinginterrupt = true
 	end
 
 	local cycles = 0
@@ -1388,7 +1427,7 @@ function cpu.new(vm, c)
 
 		local max = cycles + t
 		while cycles < max do
-			if currentexception or (pendinginterrupt and intmode()) then
+			if currentexception or (intc.interrupting and intmode()) then
 				local ev = r[37]
 
 				if band(ev, 2) ~= 0 then
@@ -1400,12 +1439,10 @@ function cpu.new(vm, c)
 				if ev == 0 then
 					print("exception but no exception vector, resetting")
 					currentexception = nil
-					pendinginterrupt = false
 					p.reset()
 					break
 				else
-					if (not currentexception) and (pendinginterrupt) and intmode() then
-						pendinginterrupt = false
+					if (not currentexception) and (intc.interrupting) and intmode() then
 						currentexception = 1
 					end
 					-- dive in
@@ -1437,7 +1474,7 @@ function cpu.new(vm, c)
 
 			cycles = cycles + 1
 
-			if r[41] ~= 0 then
+			if (timer) and (r[41] ~= 0) and (not currentexception) then
 				r[41] = r[41] - 1
 				if r[41] == 0 then
 					exception(5)

@@ -45,6 +45,8 @@ function pboard.new(vm, c, branch, intn)
 	local satsumah = satsuma.handler
 	local amtsu = pb.amtsu
 
+	c.intc = lsic
+
 	-- end deeply ugly code to return to only slightly ugly code
 
 
