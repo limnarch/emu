@@ -224,41 +224,33 @@ function w.open(window, x, y)
 	end
 end
 
+local wpw = 0
+
 -- this should only be used during initialization
-function w.pack(window)
-	window:close()
-
-	local jw = window.w
-	local jh = window.h
-
-	local ww,wh = love.graphics.getWidth()
-	local wh = love.graphics.getHeight()
-
+function w.pack(upto)
 	if not bp then
-		bp = binpack(ww, wh)
+		wpw = love.graphics.getWidth()
+		bp = binpack(wpw, love.graphics.getHeight())
 	end
 
-	local rect = bp:insert(jw, jh)
-
-	if not rect then
-		if #w.wopen > 0 then
-			local ex,ey = w.getcsize()
-
-			bpxo = bpxo + ex
+	for k,window in ipairs(w.wopen) do
+		if upto and (k > upto) then
+			break
 		end
 
-		local e = jh
+		local rect = bp:insert(window.w, window.h)
 
-		if wh > jh then
-			e = wh
+		if not rect then
+			wpw = wpw + window.w
+
+			bp = binpack(wpw, math.max(love.graphics.getHeight(), window.h))
+
+			w.pack(k)
+		else
+			window.x = rect.x
+			window.y = rect.y
 		end
-
-		bp = binpack(jw, e)
-
-		rect = bp:insert(ww, wh)
 	end
-
-	window:open(bpxo + rect.x, bpyo + rect.y)
 end
 
 function w.newObj(parent, width, height)
@@ -421,10 +413,6 @@ function w.new(name, width, height)
 
 	function e:close()
 		w.close(self)
-	end
-
-	function e:pack()
-		w.pack(self)
 	end
 
 	function e:adjust()

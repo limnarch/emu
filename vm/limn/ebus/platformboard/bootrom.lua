@@ -39,6 +39,9 @@ function rom.new(vm, c)
 		for j = 1, #e do
 			rom[j-1] = string.byte(e:sub(j,j))
 		end
+		for i = #e, 131071 do
+			rom[i] = 0
+		end
 		rf:close()
 
 		c.cpu.reset()

@@ -100,13 +100,8 @@ function love.load(arg)
 
 	love.keyboard.setKeyRepeat(true)
 
-	if vm.computer.window then
-		if vm.computer.window.gc then
-			vm.computer.window:pack()
-		end
-	end
-
 	if window then
+		window.pack()
 		window.winterest()
 	end
 end
@@ -155,7 +150,6 @@ function love.update(dt)
 		end
 	end
 
-	if cycles < vm.hz then
 		local cycle = vm.computer.cpu.cycle
 
 		local t = vm.instructionsPerTick
@@ -163,7 +157,6 @@ function love.update(dt)
 		cycles = cycles + cycle(t)
 
 		usedt = usedt + dt
-	end
 
 	--print(collectgarbage("count"))
 

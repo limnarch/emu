@@ -209,8 +209,8 @@ function cast(struct, tab, offset)
         else
             for i = 0, (s.s.sz[n]/ux)-1 do
                 local v = 0
-                for i2 = ux-1, 0, -1 do
-                    v = (v * 0x100) + (s.t[s.s.o[n] + (i*4) + i2 + s.o] or 0)
+                for j = ux-1, 0, -1 do
+                    v = (v * 0x100) + (s.t[s.s.o[n] + (i*4) + j + s.o] or 0)
                 end
                 t[i] = v
             end

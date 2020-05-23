@@ -676,16 +676,18 @@ function cpu.new(vm, c)
 				r[dest] = 0
 			end
 		end,
+
 		[0x2B] = function (addr, inst) -- [slti]
 			local dest = band(inst, 0xFF)
-			local src1 = band(rshift(inst, 8), 0xFFFF)
+			local src1 = band(rshift(inst, 8), 0xFF)
+			local src2 = band(rshift(inst, 16), 0xFF)
 
-			if (not accessdest(dest)) then
+			if (not accessdest(dest)) or (not access(src1)) then
 				exception(8)
 				return
 			end
 
-			if r[dest] < src1 then
+			if r[src1] < src2 then
 				r[dest] = 1
 			else
 				r[dest] = 0
@@ -708,16 +710,35 @@ function cpu.new(vm, c)
 				r[dest] = 0
 			end
 		end,
+
 		[0x2D] = function (addr, inst) -- [slti.s]
 			local dest = band(inst, 0xFF)
-			local src1 = band(rshift(inst, 8), 0xFFFF)
+			local src1 = band(rshift(inst, 8), 0xFF)
+			local src2 = band(rshift(inst, 16), 0xFF)
 
-			if (not accessdest(dest)) then
+			if (not accessdest(dest)) or (not access(src1)) then
 				exception(8)
 				return
 			end
 
-			if lg(r[dest]) < src1 then
+			if lg(r[src1]) < src2 then
+				r[dest] = 1
+			else
+				r[dest] = 0
+			end
+		end,
+
+		[0x2E] = function (addr, inst) -- [seqi]
+			local dest = band(inst, 0xFF)
+			local src1 = band(rshift(inst, 8), 0xFF)
+			local src2 = band(rshift(inst, 16), 0xFF)
+
+			if (not accessdest(dest)) or (not access(src1)) then
+				exception(8)
+				return
+			end
+
+			if r[src1] == src2 then
 				r[dest] = 1
 			else
 				r[dest] = 0
@@ -726,14 +747,15 @@ function cpu.new(vm, c)
 
 		[0x2F] = function (addr, inst) -- [sgti]
 			local dest = band(inst, 0xFF)
-			local src1 = band(rshift(inst, 8), 0xFFFF)
+			local src1 = band(rshift(inst, 8), 0xFF)
+			local src2 = band(rshift(inst, 16), 0xFF)
 
-			if (not accessdest(dest)) then
+			if (not accessdest(dest)) or (not access(src1)) then
 				exception(8)
 				return
 			end
 
-			if r[dest] > src1 then
+			if r[src1] > src2 then
 				r[dest] = 1
 			else
 				r[dest] = 0
@@ -742,14 +764,32 @@ function cpu.new(vm, c)
 
 		[0x30] = function (addr, inst) -- [sgti.s]
 			local dest = band(inst, 0xFF)
-			local src1 = band(rshift(inst, 8), 0xFFFF)
+			local src1 = band(rshift(inst, 8), 0xFF)
+			local src2 = band(rshift(inst, 16), 0xFF)
 
-			if (not accessdest(dest)) then
+			if (not accessdest(dest)) or (not access(src1)) then
 				exception(8)
 				return
 			end
 
-			if lg(r[dest]) > src1 then
+			if lg(r[src1]) > src2 then
+				r[dest] = 1
+			else
+				r[dest] = 0
+			end
+		end,
+
+		[0x31] = function (addr, inst) -- [snei]
+			local dest = band(inst, 0xFF)
+			local src1 = band(rshift(inst, 8), 0xFF)
+			local src2 = band(rshift(inst, 16), 0xFF)
+
+			if (not accessdest(dest)) or (not access(src1)) then
+				exception(8)
+				return
+			end
+
+			if r[src1] ~= src2 then
 				r[dest] = 1
 			else
 				r[dest] = 0
@@ -772,6 +812,7 @@ function cpu.new(vm, c)
 				r[dest] = 0
 			end
 		end,
+
 		[0x33] = function (addr, inst) -- [sne]
 			local dest = band(inst, 0xFF)
 			local src1 = band(rshift(inst, 8), 0xFF)
