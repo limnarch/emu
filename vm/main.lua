@@ -150,22 +150,13 @@ function love.update(dt)
 		end
 	end
 
-		local cycle = vm.computer.cpu.cycle
+	local cycle = vm.computer.cpu.cycle
 
-		local t = vm.instructionsPerTick
+	local t = vm.instructionsPerTick
 
-		cycles = cycles + cycle(t)
+	cycles = cycles + cycle(t)
 
-		usedt = usedt + dt
-
-	--print(collectgarbage("count"))
-
-	--[[
-	for i = 1, t do
-		cycle()
-		cycles = cycles + 1
-	end
-	]]
+	usedt = usedt + dt
 end
 
 function love.draw()
