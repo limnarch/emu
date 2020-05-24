@@ -53,26 +53,18 @@ function dmacon.new(vm, c, branch, intn, memsize)
 
 				if direction == 0 then
 					for j = 0, 7 do
-						if band(rshift(b, j), 1) == 1 then
-							if setint ~= 0xFFFFFFFF then
-								if not writeInt(dest + j*2, setint) then return false end
-							end
-						else
-							if clearint ~= 0xFFFFFFFF then
-								if not writeInt(dest + j*2, clearint) then return false end
-							end
+						if (band(rshift(b, j), 1) == 1) and (setint ~= 0xFFFFFFFF) then
+							if not writeInt(dest + j*2, setint) then return false end
+						elseif clearint ~= 0xFFFFFFFF then
+							if not writeInt(dest + j*2, clearint) then return false end
 						end
 					end
 				elseif direction == 1 then -- this doesnt actually work because apparently I don't understand bitwise math, will fix later
 					for j = 0, 7 do
-						if band(rshift(b, 7-j), 1) == 1 then
-							if setint ~= 0xFFFFFFFF then
-								if not writeInt(dest + j*2, setint) then return false end
-							end
-						else
-							if clearint ~= 0xFFFFFFFF then
-								if not writeInt(dest + j*2, clearint) then return false end
-							end
+						if (band(rshift(b, 7-j), 1) == 1) and (setint ~= 0xFFFFFFFF) then
+							if not writeInt(dest + j*2, setint) then return false end
+						elseif clearint ~= 0xFFFFFFFF then
+							if not writeInt(dest + j*2, clearint) then return false end
 						end
 					end
 				end

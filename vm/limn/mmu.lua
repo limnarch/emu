@@ -64,16 +64,16 @@ function mmu.new(vm, c)
 
 	local function translate(ptr, size)
 		for segment = 0, 3 do
-			local segsize = registers[segment * 3 + 5 + 1]*4096
+			local segsize = registers[segment * 3 + 5 + 1]*4
 
 			if segsize ~= 0 then
-				local mapaddr = registers[segment * 3 + 5 + 2]*4096
+				local mapaddr = registers[segment * 3 + 5 + 2]*4
 
 				local segtop = mapaddr + segsize - 1
 				local valtop = ptr + size - 1
 
 				if (ptr >= mapaddr) and (valtop <= segtop) then -- in this segment
-					local realaddr = registers[segment * 3 + 5 + 0]*4096
+					local realaddr = registers[segment * 3 + 5 + 0]*4
 
 					return (ptr - mapaddr) + realaddr
 				end
