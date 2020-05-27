@@ -36,7 +36,7 @@ function serial.new(vm, c, bus)
 		iq[#iq + 1] = c
 
 		if doint then
-			int(0x21)
+			int(0x3)
 		end
 	end
 

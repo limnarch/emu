@@ -43,6 +43,8 @@ function cpu.new(vm, c)
 
 	local timer = false
 
+	local halted = false
+
 	local calltrace = {}
 
 	p.regs = ffi.new("uint32_t[44]")
@@ -50,16 +52,12 @@ function cpu.new(vm, c)
 
 	r[42] = 0x80030000 -- cpuid
 
-	local function intmode()
-		return getBit(r[36], 1) == 1
-	end
+	local intmode = false
 
-	local function kmode()
-		return getBit(r[36], 0) == 0
-	end
+	local kmode = false
 
 	local function access(reg)
-		return (((reg < 32) or kmode()) and reg < 44)
+		return (((reg < 32) or kmode) and reg < 44)
 	end
 
 	local function accessdest(reg)
@@ -81,7 +79,11 @@ function cpu.new(vm, c)
 			p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
 		end
 
+		--p.dumpcalls(20)
+
 		currentexception = n
+
+		--running = false
 	end
 	local exception = p.exception
 
@@ -103,6 +105,18 @@ function cpu.new(vm, c)
 	function p.fillState(s)
 		if getBit(s, 31) == 1 then
 			c.bus.reset()
+		end
+
+		if getBit(s, 0) == 0 then
+			kmode = true
+		else
+			kmode = false
+		end
+
+		if getBit(s, 1) == 1 then
+			intmode = true
+		else
+			intmode = false
 		end
 
 		if getBit(s, 2) == 1 then
@@ -675,6 +689,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x2B] = function (addr, inst) -- [slti]
@@ -692,6 +708,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x2C] = function (addr, inst) -- [slt.s]
@@ -709,6 +727,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x2D] = function (addr, inst) -- [slti.s]
@@ -726,6 +746,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x2E] = function (addr, inst) -- [seqi]
@@ -743,6 +765,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x2F] = function (addr, inst) -- [sgti]
@@ -760,6 +784,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x30] = function (addr, inst) -- [sgti.s]
@@ -777,6 +803,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x31] = function (addr, inst) -- [snei]
@@ -794,6 +822,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x32] = function (addr, inst) -- [seq]
@@ -811,6 +841,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x33] = function (addr, inst) -- [sne]
@@ -828,6 +860,8 @@ function cpu.new(vm, c)
 			else
 				r[dest] = 0
 			end
+
+			if dest == 36 then fillState(r[36]) end
 		end,
 
 		[0x34] = function (addr, inst) -- [b]
@@ -837,7 +871,7 @@ function cpu.new(vm, c)
 			return bor(band(addr, 0xFC000000), lshift(inst, 2))
 		end,
 		[0x36] = function (addr, inst) -- [jal]
-			--calltrace[#calltrace + 1] = bor(band(addr, 0xFC000000), lshift(inst, 2))
+			--calltrace[#calltrace + 1] = r[31]
 
 			r[30] = addr + 4
 			return bor(band(addr, 0xFC000000), lshift(inst, 2))
@@ -845,7 +879,7 @@ function cpu.new(vm, c)
 		[0x37] = function (addr, inst) -- [jalr]
 			local src1 = band(inst, 0xFF)
 
-			--calltrace[#calltrace + 1] = r[src1]
+			--calltrace[#calltrace + 1] = r[31]
 
 			if not (access(src1)) then
 				exception(8)
@@ -1408,7 +1442,7 @@ function cpu.new(vm, c)
 		end,
 
 		[0x62] = function (addr, inst) -- [rfe]
-			if not kmode() then
+			if not kmode then
 				exception(8)
 				return
 			end
@@ -1416,6 +1450,15 @@ function cpu.new(vm, c)
 			fillState(r[40])
 
 			return r[38]
+		end,
+
+		[0x63] = function (addr, inst) -- [hlt]
+			if not kmode then
+				exception(8)
+				return
+			end
+
+			halted = true
 		end,
 
 		[0x67] = function (addr, inst) -- [bt]
@@ -1463,12 +1506,38 @@ function cpu.new(vm, c)
 
 	local potential = false
 
+	local userbreak = false
+
 	function p.cycle(t)
 		if not running then return 0 end
 
-		local max = cycles + t
-		while cycles < max do
-			if currentexception or (intc.interrupting and intmode()) then
+		if userbreak and not (currentexception) then
+			exception(6)
+			userbreak = false
+		end
+
+		if halted then
+			if currentexception or (intmode and intc.interrupting) then
+				halted = false
+			else
+				-- still keep track of timer if enabled
+				if timer and (r[41] ~= 0) then
+					if t >= r[41] then
+						r[41] = 0
+
+						exception(5)
+						halted = false
+					else
+						r[41] = r[41] - t
+					end
+				end
+			end
+
+			return t
+		end
+
+		for cyclesdone = 1, t do
+			if currentexception or (intmode and intc.interrupting) then
 				local ev = r[37]
 
 				if band(ev, 2) ~= 0 then
@@ -1483,7 +1552,7 @@ function cpu.new(vm, c)
 					p.reset()
 					break
 				else
-					if (not currentexception) and (intc.interrupting) and intmode() then
+					if (not currentexception) and (intmode and intc.interrupting) then
 						currentexception = 1
 					end
 					-- dive in
@@ -1519,11 +1588,12 @@ function cpu.new(vm, c)
 				r[41] = r[41] - 1
 				if r[41] == 0 then
 					exception(5)
-					break
+					return cyclesdone
 				end
 			end
 
 			if not running then break end
+			if halted then break end
 		end
 
 		return t
@@ -1656,7 +1726,7 @@ function cpu.new(vm, c)
 					running = true
 				end
 			elseif key == "escape" then
-				exception(0x6)
+				userbreak = true
 			elseif key == "r" then
 				p.reset()
 			end

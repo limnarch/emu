@@ -121,8 +121,6 @@ function love.update(dt)
 		if dbmsg then
 			print(vm.hz, cycles, timesran)
 			print("used "..tostring(usedt * 100).."% of time")
-			print(vm.computer.cpu.killedblocks)
-			vm.computer.cpu.killedblocks = 0
 		end
 
 		cycles = 0
