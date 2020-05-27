@@ -12,6 +12,8 @@ Ships with a pre-built [boot ROM](https://github.com/limnarch/a3x) binary.
 
 ## Running
 
+Install [Love2D](https://love2d.org/) 11.0 from their website, or using your favorite package manager.
+
 Modify the `./love.sh` shell script to point to your Love2D 11.0 executable.
 
 Then, type `./vm.sh` in the project directory.
