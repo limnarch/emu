@@ -96,7 +96,7 @@ function love.load(arg)
 		end
 	end
 
-	vm.instructionsPerTick = math.ceil(vm.hz / vm.targetfps)
+	vm.instructionsPerTick = math.floor(vm.hz / vm.targetfps)
 
 	love.keyboard.setKeyRepeat(true)
 
@@ -116,6 +116,8 @@ local usedt = 0
 
 local timesran = 0
 
+local lticks = 0
+
 function love.update(dt)
 	timesran = timesran + 1
 
@@ -123,8 +125,9 @@ function love.update(dt)
 
 	if (ct > 1) then
 		if dbmsg then
-			print(vm.hz, cycles, timesran)
+			print(vm.hz, cycles, timesran, vm.computer.cpu.timerticks - lticks)
 			print("used "..tostring(usedt * 100).."% of time")
+			lticks = vm.computer.cpu.timerticks
 		end
 
 		cycles = 0
@@ -154,7 +157,15 @@ function love.update(dt)
 	end
 	]]
 
-	cycles = cycles + cycle(ipt)
+	local m = ipt
+
+	while m > 0 do
+		local ip = cycle(m)
+
+		cycles = cycles + ip
+
+		m = m - ip
+	end
 
 	usedt = usedt + dt
 end

@@ -19,6 +19,8 @@ local twx = twsxsign
 function cpu.new(vm, c)
 	local p = {}
 
+	p.timerticks = 0
+
 	local mmu = c.mmu
 
 	local TfB = mmu.TfetchByte
@@ -43,6 +45,8 @@ function cpu.new(vm, c)
 
 	local timer = false
 
+	local timerset = false
+
 	local halted = false
 
 	local calltrace = {}
@@ -56,14 +60,24 @@ function cpu.new(vm, c)
 
 	local kmode = false
 
+	local tleft = 0
+
 	local function access(reg)
+		if (reg == 41) and (timer) then
+			r[41] = tleft
+		end
+
 		return (((reg < 32) or kmode) and reg < 44)
 	end
 
 	local function accessdest(reg)
 		if (reg == 0) or (reg == 42) then return false end
 
-		return access(reg)
+		if reg == 41 then
+			timerset = true
+		end
+
+		return (((reg < 32) or kmode) and reg < 44)
 	end
 
 	local currentexception = nil
@@ -77,6 +91,8 @@ function cpu.new(vm, c)
 			p.lastfaultaddr = r[31]
 
 			p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
+		elseif n == 5 then
+			p.timerticks = p.timerticks + 1
 		end
 
 		--p.dumpcalls(20)
@@ -1508,7 +1524,7 @@ function cpu.new(vm, c)
 
 	local userbreak = false
 
-	local delt = 0
+	local leftover = 0
 
 	local function runfor(t)
 		if currentexception or (intmode and intc.interrupting) then
@@ -1539,7 +1555,16 @@ function cpu.new(vm, c)
 			currentexception = nil
 		end
 
+		local ote = timer
+
+		tleft = t
+
 		for cyclesdone = 1, t do
+			if timerset then
+				timerset = false
+				return cyclesdone - 1, false, true
+			end
+
 			local pc = r[31]
 
 			local inst = fL(pc)
@@ -1551,22 +1576,25 @@ function cpu.new(vm, c)
 			if eop then
 				r[31] = pc + 4
 				r[31] = eop(pc, rshift(inst, 8)) or r[31]
+				tleft = tleft - 1
 			else
 				exception(7)
 			end
 
 			cycles = cycles + 1
 
-			if not running then break end
-			if halted then break end
-			if currentexception then
-				delt = delt + (t - cyclesdone)
-				break
-			end
+			if not running then return cyclesdone, true end
+			if halted then return cyclesdone, true end
+			if currentexception then return cyclesdone end
+			if ote ~= timer then return cyclesdone end
 		end
+
+		return t
 	end
 
 	local ticked = false
+
+	local deferred = 0
 
 	function p.cycle(t)
 		if not running then return 0 end
@@ -1576,19 +1604,17 @@ function cpu.new(vm, c)
 			userbreak = false
 		end
 
-		t = t + delt
-
-		delt = 0
-
 		if halted then
+			--print(deferred, t)
+
 			if currentexception or (intmode and intc.interrupting) then
 				halted = false
 			else
 				-- still keep track of timer if enabled
 				if timer and (r[41] ~= 0) then
 					if t >= r[41] then
+						t = t - r[41]
 						r[41] = 0
-
 						exception(5)
 						halted = false
 					else
@@ -1597,28 +1623,49 @@ function cpu.new(vm, c)
 				end
 			end
 
-			return t
-		elseif (timer) and (r[41] ~= 0) then
-			if t >= r[41] then
-				t = t - r[41]
-				delt = r[41]
-				r[41] = 0
-				ticked = true
-			else
-				r[41] = r[41] - t
-			end
-		end
-
-		runfor(t)
-
-		if ticked and (not currentexception) then
-			if not timer then
+			if halted then
 				return t
 			end
-
-			exception(5)
-			ticked = false
 		end
+
+		local left, ranfor, broke, done = t + leftover, 0, false, 0
+
+		local predicted = false
+
+		local prediction = 0
+
+		while left > 0 do
+			if timer and (r[41] ~= 0) then
+				if r[41] > left then
+					prediction = left
+					r[41] = r[41] - left
+					predicted = false
+				else
+					prediction = r[41]
+					predicted = true
+				end
+			else
+				prediction = left
+				predicted = false
+			end
+
+			ranfor, broke, changed = runfor(prediction)
+
+			done = done + ranfor
+			left = left - ranfor
+
+			if broke then
+				leftover = t - done
+				return done
+			end
+
+			if timer and predicted and (not changed) and (not currentexception) then -- prediction was correct
+				r[41] = 0
+				exception(5)
+			end
+		end
+
+		leftover = 0
 
 		return t
 	end
