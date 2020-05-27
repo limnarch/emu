@@ -10,10 +10,10 @@ The long-term goal is to create a really neat (but useless) emulated desktop com
 
 Ships with a pre-built [boot ROM](https://github.com/limnarch/a3x) binary.
 
-![Running the Antecedent 3.x boot firmware](https://i.imgur.com/RkW6RG8.png)
-
 ## Running
 
 Modify the `./love.sh` shell script to point to your Love2D 11.0 executable.
 
 Then, type `./vm.sh` in the project directory.
+
+![Running the Antecedent 3.x boot firmware](https://i.imgur.com/RkW6RG8.png)
