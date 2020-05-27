@@ -73,7 +73,7 @@ function cpu.new(vm, c)
 			error("double exception, shouldnt ever happen")
 		end
 
-		if n ~= 1 then
+		if (n ~= 5) and (n ~= 1) then -- fault, do some debug info
 			p.lastfaultaddr = r[31]
 
 			p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
@@ -1508,6 +1508,66 @@ function cpu.new(vm, c)
 
 	local userbreak = false
 
+	local delt = 0
+
+	local function runfor(t)
+		if currentexception or (intmode and intc.interrupting) then
+			local ev = r[37]
+
+			if band(ev, 2) ~= 0 then
+				print("unaligned exception vector, resetting")
+				p.reset()
+			end
+
+			if ev == 0 then
+				print("exception but no exception vector, resetting")
+				currentexception = nil
+				p.reset()
+			else
+				if not currentexception then -- must be an interrupt
+					currentexception = 1
+				end
+				-- dive in
+
+				r[38] = r[31]
+				r[31] = ev
+				r[39] = currentexception
+				r[40] = r[36]
+				fillState(0)
+			end
+
+			currentexception = nil
+		end
+
+		for cyclesdone = 1, t do
+			local pc = r[31]
+
+			local inst = fL(pc)
+
+			if not inst then break end
+
+			local eop = ops[band(inst, 0xFF)]
+
+			if eop then
+				r[31] = pc + 4
+				r[31] = eop(pc, rshift(inst, 8)) or r[31]
+			else
+				exception(7)
+			end
+
+			cycles = cycles + 1
+
+			if not running then break end
+			if halted then break end
+			if currentexception then
+				delt = delt + (t - cyclesdone)
+				break
+			end
+		end
+	end
+
+	local ticked = false
+
 	function p.cycle(t)
 		if not running then return 0 end
 
@@ -1515,6 +1575,10 @@ function cpu.new(vm, c)
 			exception(6)
 			userbreak = false
 		end
+
+		t = t + delt
+
+		delt = 0
 
 		if halted then
 			if currentexception or (intmode and intc.interrupting) then
@@ -1534,66 +1598,26 @@ function cpu.new(vm, c)
 			end
 
 			return t
+		elseif (timer) and (r[41] ~= 0) then
+			if t >= r[41] then
+				t = t - r[41]
+				delt = r[41]
+				r[41] = 0
+				ticked = true
+			else
+				r[41] = r[41] - t
+			end
 		end
 
-		for cyclesdone = 1, t do
-			if currentexception or (intmode and intc.interrupting) then
-				local ev = r[37]
+		runfor(t)
 
-				if band(ev, 2) ~= 0 then
-					print("unaligned exception vector, resetting")
-					p.reset()
-					break
-				end
-
-				if ev == 0 then
-					print("exception but no exception vector, resetting")
-					currentexception = nil
-					p.reset()
-					break
-				else
-					if (not currentexception) and (intmode and intc.interrupting) then
-						currentexception = 1
-					end
-					-- dive in
-
-					r[38] = r[31]
-					r[31] = ev
-					r[39] = currentexception
-					r[40] = r[36]
-					fillState(0)
-				end
-
-				currentexception = nil
+		if ticked and (not currentexception) then
+			if not timer then
+				return t
 			end
 
-			local pc = r[31]
-
-			local inst = fL(pc)
-
-			if not inst then break end
-
-			local eop = ops[band(inst, 0xFF)]
-
-			if eop then
-				r[31] = pc + 4
-				r[31] = eop(pc, rshift(inst, 8)) or r[31]
-			else
-				exception(7)
-			end
-
-			cycles = cycles + 1
-
-			if (timer) and (r[41] ~= 0) and (not currentexception) then
-				r[41] = r[41] - 1
-				if r[41] == 0 then
-					exception(5)
-					return cyclesdone
-				end
-			end
-
-			if not running then break end
-			if halted then break end
+			exception(5)
+			ticked = false
 		end
 
 		return t

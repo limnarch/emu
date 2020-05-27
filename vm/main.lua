@@ -104,6 +104,10 @@ function love.load(arg)
 		window.pack()
 		window.winterest()
 	end
+
+	cycle = vm.computer.cpu.cycle
+
+	ipt = vm.instructionsPerTick
 end
 
 local cycles = 0
@@ -135,6 +139,7 @@ function love.update(dt)
 		vct[i](dt)
 	end
 
+	--[[
 	local vtimed = vm.timed
 	local vtl = #vtimed
 	for i = 1, vtl do
@@ -147,12 +152,9 @@ function love.update(dt)
 			table.remove(vtimed, i)
 		end
 	end
+	]]
 
-	local cycle = vm.computer.cpu.cycle
-
-	local t = vm.instructionsPerTick
-
-	cycles = cycles + cycle(t)
+	cycles = cycles + cycle(ipt)
 
 	usedt = usedt + dt
 end
