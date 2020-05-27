@@ -22,6 +22,7 @@ vm.speed = 1
 vm.hz = 10000000
 vm.targetfps = 60
 vm.instructionsPerTick = 0
+vm.errPerTick = 0
 
 vm.cb = {}
 vm.cb.update = {}
@@ -98,6 +99,8 @@ function love.load(arg)
 
 	vm.instructionsPerTick = math.floor(vm.hz / vm.targetfps)
 
+	vm.errPerTick = vm.hz/vm.targetfps - vm.instructionsPerTick
+
 	love.keyboard.setKeyRepeat(true)
 
 	if window then
@@ -108,6 +111,8 @@ function love.load(arg)
 	cycle = vm.computer.cpu.cycle
 
 	ipt = vm.instructionsPerTick
+
+	ept = vm.errPerTick
 end
 
 local cycles = 0
@@ -117,6 +122,8 @@ local usedt = 0
 local timesran = 0
 
 local lticks = 0
+
+local err = 0
 
 function love.update(dt)
 	timesran = timesran + 1
@@ -131,7 +138,7 @@ function love.update(dt)
 		end
 
 		cycles = 0
-		ct = 0
+		ct = ct - 1
 		usedt = 0
 		timesran = 0
 	end
@@ -159,6 +166,11 @@ function love.update(dt)
 
 	local m = ipt
 
+	if err > 1 then
+		m = m + 1
+		err = err - 1
+	end
+
 	while m > 0 do
 		local ip = cycle(m)
 
@@ -168,6 +180,8 @@ function love.update(dt)
 	end
 
 	usedt = usedt + dt
+
+	err = err + ept
 end
 
 function love.draw()
