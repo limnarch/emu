@@ -1597,7 +1597,7 @@ function cpu.new(vm, c)
 	local deferred = 0
 
 	function p.cycle(t)
-		if not running then return 0 end
+		if not running then return t end
 
 		if userbreak and not (currentexception) then
 			exception(6)
