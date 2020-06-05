@@ -1634,6 +1634,8 @@ function cpu.new(vm, c)
 
 		local prediction = 0
 
+		local countwithoutsignal = false
+
 		while left > 0 do
 			if timer and (r[41] ~= 0) then
 				if r[41] > left then
@@ -1645,7 +1647,13 @@ function cpu.new(vm, c)
 					predicted = true
 				end
 			else
-				prediction = left
+				if (r[41] > 1) then
+					countwithoutsignal = true
+					prediction = r[41]
+				else
+					prediction = left
+				end
+
 				predicted = false
 			end
 
@@ -1657,6 +1665,15 @@ function cpu.new(vm, c)
 			if broke then
 				leftover = t - done
 				return done
+			end
+
+			if (not timer) and countwithoutsignal then
+				if ranfor >= r[41] then
+					r[41] = 1
+				else
+					r[41] = r[41] - ranfor
+				end
+				countwithoutsignal = false
 			end
 
 			if timer and predicted and (not changed) and (not currentexception) then -- prediction was correct
