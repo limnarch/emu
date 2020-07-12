@@ -71,7 +71,7 @@ function cpu.new(vm, c)
 	end
 
 	local function accessdest(reg)
-		if (reg == 0) or (reg == 42) then return false end
+		if (reg == 0) or (reg == 42) or (reg == 31) then return false end
 
 		if reg == 41 then
 			timerset = true
@@ -99,7 +99,11 @@ function cpu.new(vm, c)
 
 		currentexception = n
 
+		--error(string.format("%X %X", n, r[31]))
+
 		--running = false
+
+		--print(string.format("%x", fL(r[31]-4)))
 	end
 	local exception = p.exception
 
@@ -887,15 +891,11 @@ function cpu.new(vm, c)
 			return bor(band(addr, 0xFC000000), lshift(inst, 2))
 		end,
 		[0x36] = function (addr, inst) -- [jal]
-			--calltrace[#calltrace + 1] = r[31]
-
 			r[30] = addr + 4
 			return bor(band(addr, 0xFC000000), lshift(inst, 2))
 		end,
 		[0x37] = function (addr, inst) -- [jalr]
 			local src1 = band(inst, 0xFF)
-
-			--calltrace[#calltrace + 1] = r[31]
 
 			if not (access(src1)) then
 				exception(8)
@@ -903,6 +903,16 @@ function cpu.new(vm, c)
 			end
 
 			r[30] = addr + 4
+			return r[src1]
+		end,
+		[0x38] = function (addr, inst) -- [jr]
+			local src1 = band(inst, 0xFF)
+
+			if not (access(src1)) then
+				exception(8)
+				return
+			end
+
 			return r[src1]
 		end,
 
@@ -924,9 +934,9 @@ function cpu.new(vm, c)
 				return
 			end
 
-			--if src1 == 30 then
-			--	calltrace[#calltrace] = nil
-			--end
+			if src1 == 30 then
+				calltrace[#calltrace] = nil
+			end
 
 			r[dest] = r[src1] + r[src2]
 
@@ -1478,13 +1488,13 @@ function cpu.new(vm, c)
 		end,
 
 		[0x67] = function (addr, inst) -- [bt]
-			if r[26] ~= 0 then
+			if r[28] ~= 0 then
 				return addr + twx(lshift(inst, 2))
 			end
 		end,
 
 		[0x68] = function (addr, inst) -- [bf]
-			if r[26] == 0 then
+			if r[28] == 0 then
 				return addr + twx(lshift(inst, 2))
 			end
 		end,
@@ -1692,35 +1702,35 @@ function cpu.new(vm, c)
 
 	p.regmnem = {
 		"zero",
-		"r1",
-		"r2",
-		"r3",
-		"r4",
-		"r5",
-		"r6",
-		"r7",
-		"r8",
-		"r9",
-		"r10",
-		"r11",
-		"r12",
-		"r13",
-		"r14",
-		"r15",
-		"r16",
-		"r17",
-		"r18",
-		"r19",
-		"r20",
-		"r21",
-		"r22",
-		"r23",
-		"r24",
-		"r25",
-		"tf",
-		"vs",
+		"t0",
+		"t1",
+		"t2",
+		"t3",
+		"t4",
+		"a0",
+		"a1",
+		"a2",
+		"a3",
+		"v0",
+		"v1",
+		"s0",
+		"s1",
+		"s2",
+		"s3",
+		"s4",
+		"s5",
+		"s6",
+		"s7",
+		"s8",
+		"s9",
+		"s10",
+		"s11",
+		"s12",
+		"s13",
+		"s14",
 		"at",
 		"sp",
+		"tf",
 		"lr",
 		"pc",
 
@@ -1750,14 +1760,6 @@ function cpu.new(vm, c)
 			if r then
 				return r,off
 			end
-		end
-	end
-
-	function p.dumpcalls(max)
-		calltrace[#calltrace + 1] = r[31]
-
-		for i = 1, math.min(max, #calltrace) do
-			print(string.format("[%d] %x %s", i, calltrace[#calltrace - i + 1], gsymstr(p.loffsym(calltrace[#calltrace - i + 1]))))
 		end
 	end
 
