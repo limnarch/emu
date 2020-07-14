@@ -1729,8 +1729,8 @@ function cpu.new(vm, c)
 		"s13",
 		"s14",
 		"at",
-		"sp",
 		"tf",
+		"sp",
 		"lr",
 		"pc",
 
