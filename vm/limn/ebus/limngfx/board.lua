@@ -61,6 +61,14 @@ function gpu.new(vm, c, page, intn)
 
 		fbsize = w * h * 2
 
+		if imageData then
+			imageData:release()
+		end
+
+		if image then
+			image:release()
+		end
+
 		imageData = love.image.newImageData(width, height)
 
 		imageData:mapPixel( function () return 0,0,0,1 end )
