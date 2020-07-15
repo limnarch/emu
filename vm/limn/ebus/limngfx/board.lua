@@ -20,14 +20,14 @@ local gpu = {}
 function gpu.new(vm, c, page, intn)
 	local v = {}
 
-	local width = 1280
-	local height = 1024
+	local width
+	local height
+
+	local fbsize
 
 	local boardID = 0x4B494E34
 
 	local vramsize = 0x400000
-
-	local fbsize = width * height * 2
 
 	local vram = ffi.new("uint8_t[?]", vramsize)
 
@@ -49,16 +49,40 @@ function gpu.new(vm, c, page, intn)
 		[8] = true,
 	}
 
-	registers[0] = bor(lshift(band(height, 0xFFF), 12), band(width, 0xFFF))
 	registers[1] = vramsize
+
+	local imageData
+
+	local image
+
+	local function initw(w, h)
+		width = w
+		height = h
+
+		fbsize = w * h * 2
+
+		imageData = love.image.newImageData(width, height)
+
+		imageData:mapPixel( function () return 0,0,0,1 end )
+
+		image = love.graphics.newImage(imageData)
+
+		registers[0] = bor(lshift(band(height, 0xFFF), 12), band(width, 0xFFF))
+	end
+
+	initw(1024, 768)
 
 	local driverrom = c.bus.rom("limn/ebus/limngfx/limngfx.u")
 
-	local imageData = love.image.newImageData(width, height)
-	 
-	imageData:mapPixel( function () return 0,0,0,1 end )
+	vm.registerOpt("-limngfx,size", function (arg, i)
+		initw(arg[i+1], arg[i+2])
 
-	local image = love.graphics.newImage(imageData)
+		if c.window then
+			c.window:setDim(width, height)
+		end
+
+		return 3
+	end)
 
 	function v.reset()
 		registers[2] = 0
