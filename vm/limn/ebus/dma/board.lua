@@ -23,7 +23,7 @@ function dmacon.new(vm, c, branch, intn, memsize)
 	dma.registers = ffi.new("uint32_t[14]")
 	local registers = dma.registers
 
-	local function opbits() -- copies bytes at a time, blows up the bits of each byte into their own ints
+	local function opbits() -- copies bytes at a time, blows up the bits of each byte into their own ints, good for font acceleration
 		local source = registers[0]
 		local dest = registers[1]
 		local sinc = registers[2]
