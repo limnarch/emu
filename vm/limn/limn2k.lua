@@ -1811,13 +1811,15 @@ function cpu.new(vm, c)
 			if key == "return" then
 				running = not running
 
-				if idling then
-					idling = false
+				if halted then
+					halted = false
 					running = true
 				end
 			elseif key == "escape" then
 				userbreak = true
 			elseif key == "r" then
+				halted = false
+				running = true
 				p.reset()
 			end
 		end
