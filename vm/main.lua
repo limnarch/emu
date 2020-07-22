@@ -164,7 +164,15 @@ function love.update(dt)
 	end
 	]]
 
-	cycles = cycles + cycle(ipt)
+	local m = ipt
+
+	while m > 0 do
+		local ip = cycle(m)
+
+		cycles = cycles + ip
+
+		m = m - ip
+	end
 
 	usedt = usedt + dt
 end

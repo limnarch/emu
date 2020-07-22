@@ -63,10 +63,6 @@ function cpu.new(vm, c)
 	local tleft = 0
 
 	local function access(reg)
-		if (reg == 41) and (timer) then
-			r[41] = tleft
-		end
-
 		return (((reg < 32) or kmode) and reg < 44)
 	end
 
@@ -1543,8 +1539,6 @@ function cpu.new(vm, c)
 		end
 
 		if halted then
-			--print(deferred, t)
-
 			if currentexception or (intmode and intc.interrupting) then
 				halted = false
 			else
@@ -1611,6 +1605,10 @@ function cpu.new(vm, c)
 				end
 
 				cycles = cycles + 1
+			end
+
+			if halted then
+				return i
 			end
 
 			if timer and (r[41] > 0) then
