@@ -164,24 +164,9 @@ function love.update(dt)
 	end
 	]]
 
-	local m = ipt
-
-	if err > 1 then
-		m = m + 1
-		err = err - 1
-	end
-
-	while m > 0 do
-		local ip = cycle(m)
-
-		cycles = cycles + ip
-
-		m = m - ip
-	end
+	cycles = cycles + cycle(ipt)
 
 	usedt = usedt + dt
-
-	err = err + ept
 end
 
 function love.draw()

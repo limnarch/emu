@@ -38,51 +38,63 @@ function mmu.new(vm, c)
 
 	--[[
 
-	0: reserved
-	1: reserved
-	2: reserved
-	3: reserved
-	4: faulting address
+	0: faulting address
+	1: fault cause
+	   0: none
+	   1: not present
+	   2: out of bounds
+	   3: not writable
 
-	5: real seg 0
-	6: size seg 0
-	7: mapaddr seg 0
+	2: phys page and flags
+	3: size in pages
 
-	8: real seg 1
-	9: size seg 1
-	10: mapaddr seg 1
+	4: phys page and flags
+	5: size in pages
 
-	11: real seg 2
-	12: size seg 2
-	13: mapaddr seg 2
+	6: phys page and flags
+	7: size in pages
 
-	14: real seg 3
-	15: size seg 3
-	16: mapaddr seg 3
+	8: phys page and flags
+	9: size in pages
+
+	flags/physpage:
+
+	31 30 ............ 17 16 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
+	RW  P          N/A                                        Page
 
 	]]
 
-	local function translate(ptr, size)
-		for segment = 0, 3 do
-			local segsize = registers[segment * 3 + 5 + 1]*4
+	local RWBIT = 0x80000000
+	local PBIT = 0x40000000
 
-			if segsize ~= 0 then
-				local mapaddr = registers[segment * 3 + 5 + 2]*4
+	local SEGSHIFT = 30
+	local OFFMASK = 0x3FFFFFFF
+	local PHYSMASK = 0x3FFFF
 
-				local segtop = mapaddr + segsize - 1
-				local valtop = ptr + size - 1
+	local function translate(ptr, size, write)
+		local seg = rshift(ptr, SEGSHIFT)
+		local off = band(ptr, OFFMASK)
+		local b = (seg*2)+2
 
-				if (ptr >= mapaddr) and (valtop <= segtop) then -- in this segment
-					local realaddr = registers[segment * 3 + 5 + 0]*4
+		local flags = registers[b]
+		local sz = registers[b+1] * 4096
 
-					return (ptr - mapaddr) + realaddr
-				end
-			end
+		local exc = 0
+
+		if band(flags, PBIT) == 0 then
+			exc = 1
+		elseif (off+size) >= sz then
+			exc = 2
+		elseif write and (band(flags, RWBIT) == 0) then
+			exc = 3
 		end
 
-		-- not in a segment
+		if exc == 0 then
+			return (band(flags, PHYSMASK) * 4096) + off
+		end
 
-		registers[4] = ptr
+		registers[0] = ptr
+		registers[1] = exc
 		c.cpu.pagefault(ptr)
 		return false
 	end
@@ -139,7 +151,7 @@ function mmu.new(vm, c)
 	function m.storeByte(ptr, v)
 		if not m.translating then return TstoreByte(ptr, v) end
 
-		local ta = translate(ptr, 1)
+		local ta = translate(ptr, 1, true)
 
 		if ta then
 			return TstoreByte(ta, v)
@@ -150,7 +162,7 @@ function mmu.new(vm, c)
 	function m.storeInt(ptr, v)
 		if not m.translating then return TstoreInt(ptr, v) end
 
-		local ta = translate(ptr, 2)
+		local ta = translate(ptr, 2, true)
 
 		if ta then
 			return TstoreInt(ta, v)
@@ -171,7 +183,7 @@ function mmu.new(vm, c)
 			return TstoreLong(ptr, v)
 		end
 
-		local ta = translate(ptr, 4)
+		local ta = translate(ptr, 4, true)
 
 		if ta then
 			return TstoreLong(ta, v)

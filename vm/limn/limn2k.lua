@@ -73,10 +73,6 @@ function cpu.new(vm, c)
 	local function accessdest(reg)
 		if (reg == 0) or (reg == 42) or (reg == 31) then return false end
 
-		if reg == 41 then
-			timerset = true
-		end
-
 		return (((reg < 32) or kmode) and reg < 44)
 	end
 
@@ -91,8 +87,6 @@ function cpu.new(vm, c)
 			p.lastfaultaddr = r[31]
 
 			p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
-		elseif n == 5 then
-			p.timerticks = p.timerticks + 1
 		end
 
 		--p.dumpcalls(20)
@@ -1536,72 +1530,6 @@ function cpu.new(vm, c)
 
 	local leftover = 0
 
-	local function runfor(t)
-		if currentexception or (intmode and intc.interrupting) then
-			local ev = r[37]
-
-			if band(ev, 2) ~= 0 then
-				print("unaligned exception vector, resetting")
-				p.reset()
-			end
-
-			if ev == 0 then
-				print("exception but no exception vector, resetting")
-				currentexception = nil
-				p.reset()
-			else
-				if not currentexception then -- must be an interrupt
-					currentexception = 1
-				end
-				-- dive in
-
-				r[38] = r[31]
-				r[31] = ev
-				r[39] = currentexception
-				r[40] = r[36]
-				fillState(0)
-			end
-
-			currentexception = nil
-		end
-
-		local ote = timer
-
-		tleft = t
-
-		for cyclesdone = 1, t do
-			if timerset then
-				timerset = false
-				return cyclesdone - 1, false, true
-			end
-
-			local pc = r[31]
-
-			local inst = fL(pc)
-
-			if not inst then break end
-
-			local eop = ops[band(inst, 0xFF)]
-
-			if eop then
-				r[31] = pc + 4
-				r[31] = eop(pc, rshift(inst, 8)) or r[31]
-				tleft = tleft - 1
-			else
-				exception(7)
-			end
-
-			cycles = cycles + 1
-
-			if not running then return cyclesdone, true end
-			if halted then return cyclesdone, true end
-			if currentexception then return cyclesdone end
-			if ote ~= timer then return cyclesdone end
-		end
-
-		return t
-	end
-
 	local ticked = false
 
 	local deferred = 0
@@ -1638,61 +1566,66 @@ function cpu.new(vm, c)
 			end
 		end
 
-		local left, ranfor, broke, done = t + leftover, 0, false, 0
+		for i = 1, t do
+			if currentexception or (intmode and intc.interrupting) then
+				local ev = r[37]
 
-		local predicted = false
-
-		local prediction = 0
-
-		local countwithoutsignal = false
-
-		while left > 0 do
-			if timer and (r[41] ~= 0) then
-				if r[41] > left then
-					prediction = left
-					r[41] = r[41] - left
-					predicted = false
-				else
-					prediction = r[41]
-					predicted = true
-				end
-			else
-				if (r[41] > 1) then
-					countwithoutsignal = true
-					prediction = r[41]
-				else
-					prediction = left
+				if band(ev, 2) ~= 0 then
+					print("unaligned exception vector, resetting")
+					p.reset()
 				end
 
-				predicted = false
-			end
-
-			ranfor, broke, changed = runfor(prediction)
-
-			done = done + ranfor
-			left = left - ranfor
-
-			if broke then
-				leftover = t - done
-				return done
-			end
-
-			if (not timer) and countwithoutsignal then
-				if ranfor >= r[41] then
-					r[41] = 1
+				if ev == 0 then
+					print("exception but no exception vector, resetting")
+					currentexception = nil
+					p.reset()
 				else
-					r[41] = r[41] - ranfor
+					if not currentexception then -- must be an interrupt
+						currentexception = 1
+					end
+					-- dive in
+
+					r[38] = r[31]
+					r[31] = ev
+					r[39] = currentexception
+					r[40] = r[36]
+					fillState(0)
 				end
-				countwithoutsignal = false
+
+				currentexception = nil
 			end
 
-			if timer and predicted and (not changed) and (not currentexception) then -- prediction was correct
-				r[41] = 0
-				exception(5)
+			local pc = r[31]
+
+			local inst = fL(pc)
+
+			if inst then
+				local eop = ops[band(inst, 0xFF)]
+
+				if eop then
+					r[31] = pc + 4
+					r[31] = eop(pc, rshift(inst, 8)) or r[31]
+					tleft = tleft - 1
+				else
+					exception(7)
+				end
+
+				cycles = cycles + 1
+			end
+
+			if timer and (r[41] > 0) then
+				r[41] = r[41] - 1
+
+				if r[41] == 0 then
+					if not currentexception then
+						exception(5)
+						p.timerticks = p.timerticks + 1
+					else
+						r[41] = 1
+					end
+				end
 			end
 		end
-
-		leftover = 0
 
 		return t
 	end
