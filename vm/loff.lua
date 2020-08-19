@@ -114,12 +114,15 @@ function loff.new(filename)
 		local magic = hdr.gv("magic")
 
 		if magic == 0x4C4F4646 then
-			-- goooo d
+			print(string.format("objtool: '%s' is in an older LOFF format and needs to be rebuilt", self.path))
+			return false
 		elseif magic == 0x4C455830 then
 			print(string.format("objtool: '%s' is in legacy AIXO format and needs to be rebuilt", self.path))
 			return false
+		elseif magic == 0x4C4F4632 then
+			-- goood
 		else
-			print(string.format("objtool: '%s' has bad magic %X", self.path, hdr.gv("magic")))
+			print(string.format("objtool: '%s' isn't a LOFF format", self.path))
 			return false
 		end
 
@@ -168,7 +171,7 @@ function loff.new(filename)
 			symt.section = sym.gv("section")
 
 			if symt.section > 3 then
-				print(string.format("objtool: '%s' section # > 3"), self.path)
+				print(string.format("objtool: '%s': section # > 3", self.path))
 				return false
 			end
 
@@ -272,41 +275,29 @@ function loff.new(filename)
 
 			local s = self.sections[section]
 
-			for k,v in ipairs(s.fixups) do
-				if not v.symbol then
-					if v.size <= 8 then
-						local type_s = struct({{v.size, "value"}})
-						local addrs = cast(type_s, s.contents, v.offset)
-						addrs.sv("value", ((addrs.gv("value") * v.divisor) - s.linkedAddress + address) / v.divisor)
-					end
-				end
-			end
+			s.linkedAddress = address
 
-			if not relative then
-				s.linkedAddress = address
+			for i = 1, 2 do
+				local s2 = self.sections[i]
 
-				for i = 1, 2 do
-					local s2 = self.sections[i]
+				for k,v in ipairs(s2.fixups) do
+					local sym = v.symbol
 
-					for k,v in ipairs(s2.fixups) do
-						local sym = v.symbol
+					if sym and (sym.section == section) then
+						if v.size <= 8 then
+							local type_s = struct({{v.size, "value"}})
+							local addrs = cast(type_s, s2.contents, v.offset)
 
-						if sym and (sym.section == section) then
-							if v.size <= 8 then
-								local type_s = struct({{v.size, "value"}})
-								local addrs = cast(type_s, s2.contents, v.offset)
-
-								if sym.symtype == 4 then
-									if sym.value == 1 then
-										addrs.sv("value", s.linkedAddress)
-									elseif sym.value == 2 then
-										addrs.sv("value", math.floor(s.size / v.divisor))
-									elseif sym.value == 3 then
-										addrs.sv("value", (s.linkedAddress + s.size) / v.divisor)
-									end
-								else
-									addrs.sv("value", (sym.value + s.linkedAddress) / v.divisor)
+							if sym.symtype == 4 then
+								if sym.value == 1 then
+									addrs.sv("value", math.floor(s.linkedAddress / v.divisor))
+								elseif sym.value == 2 then
+									addrs.sv("value", math.floor(s.size / v.divisor))
+								elseif sym.value == 3 then
+									addrs.sv("value", math.floor((s.linkedAddress + s.size) / v.divisor))
 								end
+							else
+								addrs.sv("value", math.floor((sym.value + s.linkedAddress) / v.divisor))
 							end
 						end
 					end
@@ -318,7 +309,7 @@ function loff.new(filename)
 
 		function self:relocInFile(section, offset) -- blindly assumes linkedAddress = 0, caller check
 			if offset ~= 0 then
-				self:relocTo(section, offset, true)
+				self:relocTo(section, offset)
 
 				for i = 0, #self.symbols do
 					local sym = self.symbols[i]
@@ -340,7 +331,7 @@ function loff.new(filename)
 			end
 		end
 
-		function self:binary(base, bss)
+		function self:binary(nobss, base, bss)
 			if base then
 				if self.linkable then
 					self:relocTo(1, base)
@@ -371,7 +362,7 @@ function loff.new(filename)
 				local s = self.sections[i]
 
 				if i == 3 then
-					if not bss then
+					if (not bss) and (not nobss) then
 						for b = 0, s.size - 1 do
 							file:write(string.char(0))
 						end
@@ -391,15 +382,22 @@ function loff.new(filename)
 		local sortedsym
 
 		local function sortsyms(s1,s2)
+			if s1.section == 0 then return false end
+			if s2.section == 0 then return false end
+
 			return (s1.value + s1.sectiont.linkedAddress) < (s2.value + s2.sectiont.linkedAddress)
 		end
 
-		function self:getSym(address)
+		function self:iSymSort()
 			if not sortedsym then
 				table.sort(self.isym, sortsyms)
 
 				sortedsym = true
 			end
+		end
+
+		function self:getSym(address)
+			self:iSymSort()
 
 			for i = 1, 3 do
 				local s = self.sections[i]
@@ -412,7 +410,6 @@ function loff.new(filename)
 							if address >= (sym.value + s.linkedAddress) then
 								thesym = sym
 							elseif address < (sym.value + s.linkedAddress) then
-								if not thesym then return end
 								return thesym, address - (thesym.value + s.linkedAddress)
 							end
 						end
@@ -475,11 +472,22 @@ function loff.new(filename)
 		end
 
 		if self.linkable then
+			local sp = {}
+
 			for i = 0, #self.symbols do
 				local sym = self.symbols[i]
 
 				if sym and (not sym.resolved) then
-					sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+					if sym.symtype == 4 then
+						if not sp[sym.name] then
+							sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+							sp[sym.name] = sym.index
+						else
+							sym.index = sp[sym.name]
+						end
+					else
+						sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+					end
 				end
 			end
 		elseif self.entrySymbol then
@@ -516,6 +524,7 @@ function loff.new(filename)
 			if self.linkable then
 				for k,v in ipairs(s.fixups) do
 					local sindex = 0xFFFFFFFF
+
 					if v.symbol and (not v.symbol.resolved) then
 						sindex = v.symbol.index
 					end
@@ -527,10 +536,15 @@ function loff.new(filename)
 			end
 		end
 
+		while strtabsize % 4 ~= 0 do
+			strtab = strtab .. string.char(0)
+			strtabsize = strtabsize + 1
+		end
+
 		-- make header
 		local size = 72
 
-		local header = "FFOL"
+		local header = "2FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)
@@ -722,11 +736,9 @@ function loff.new(filename)
 					else
 						--print("didnt resolve")
 					end
-
-					v.symbol = nil
-				else
-					v.symbol = sym.resolved
 				end
+
+				v.symbol = sym.resolved
 			end
 		end
 
@@ -744,7 +756,7 @@ function loff.new(filename)
 		end
 
 		if with.codeType ~= self.codeType then
-			print(string.format("objtool: warning: linking 2 object files of differing code types, %d and %d", with.codeType, self.codeType))
+			print(string.format("objtool: warning: linking 2 object files of differing code types, %d and %d\n  %s\n  %s", self.codeType, with.codeType, self.path, with.path))
 		end
 
 		if self.entrySymbol and with.entrySymbol then
