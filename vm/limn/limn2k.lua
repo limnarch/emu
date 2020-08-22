@@ -1490,6 +1490,14 @@ function cpu.new(vm, c)
 		end,
 
 		[0xFE] = function (addr, inst)
+			print("this message is a separator")
+		end,
+
+		[0xFD] = function (addr, inst)
+			print(p.mkrs())
+		end,
+
+		[0xFE] = function (addr, inst)
 			running = false
 		end,
 
@@ -1611,6 +1619,10 @@ function cpu.new(vm, c)
 				return i
 			end
 
+			if not running then
+				return i
+			end
+
 			if timer and (r[41] > 0) then
 				r[41] = r[41] - 1
 
@@ -1694,6 +1706,33 @@ function cpu.new(vm, c)
 		end
 	end
 
+	function p.mkrs()
+		local s = ""
+
+		for i = 0, 43 do
+			s = s .. string.format("%s = $%X", p.regmnem[i+1], r[i]) .. "\n"
+
+			if (i == 31) or (i == 38) or (i == 37) or (i == 30) then
+				local sym,off = p.loffsym(r[i])
+				if sym then
+					s = s .. gsymstr(sym,off) .. "\n"
+				end
+			end
+		end
+
+		--s = s .. string.format("queue depth = %d", #intq) .. "\n"
+
+		if p.lastfaultaddr then
+			s = s .. string.format("last fault @ 0x%X", p.lastfaultaddr) .. "\n"
+
+			if p.lastfaultsym then
+				s = s .. gsymstr(p.lastfaultsym,p.lastfaultoff) .. "\n"
+			end
+		end
+
+		return s
+	end
+
 	vm.registerOpt("-limn2k,loff", function (arg, i)
 		local image = loff.new(arg[i + 1])
 
@@ -1708,30 +1747,7 @@ function cpu.new(vm, c)
 		p.window = vm.window.new("CPU Info", 10*25, 10*45)
 
 		local function draw(_, dx, dy)
-			local s = ""
-
-			for i = 0, 43 do
-				s = s .. string.format("%s = $%X", p.regmnem[i+1], r[i]) .. "\n"
-
-				if (i == 31) or (i == 38) or (i == 37) or (i == 30) then
-					local sym,off = p.loffsym(r[i])
-					if sym then
-						s = s .. gsymstr(sym,off) .. "\n"
-					end
-				end
-			end
-
-			--s = s .. string.format("queue depth = %d", #intq) .. "\n"
-
-			if p.lastfaultaddr then
-				s = s .. string.format("last fault @ 0x%X", p.lastfaultaddr) .. "\n"
-
-				if p.lastfaultsym then
-					s = s .. gsymstr(p.lastfaultsym,p.lastfaultoff) .. "\n"
-				end
-			end
-
-			love.graphics.print(s, dx, dy)
+			love.graphics.print(p.mkrs(), dx, dy)
 		end
 
 		local wc = p.window:addElement(window.canvas(p.window, draw, p.window.w, p.window.h))

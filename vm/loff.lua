@@ -406,7 +406,7 @@ function loff.new(filename)
 					local thesym
 
 					for k,sym in ipairs(self.isym) do
-						if (sym.section == i) and (sym.symtype ~= 4) then
+						if (sym.section == i) and (sym.symtype == 1) then
 							if address >= (sym.value + s.linkedAddress) then
 								thesym = sym
 							elseif address < (sym.value + s.linkedAddress) then
