@@ -10,8 +10,10 @@ function mouse.new(vm, c)
 
 	m.mid = 0x4D4F5553
 
-	local inf1 = 0
-	local inf2 = 0
+	local move = 0
+
+	local mr = 0
+	local mp = 0
 
 	local dx = 0
 	local dy = 0
@@ -36,21 +38,25 @@ function mouse.new(vm, c)
 		return band(n, 0xFFFF)
 	end
 
-	function m.info(i1, i2)
-		ift = {i1, i2}
-
-		int()
-	end
-
 	function m.action(v)
 		if v == 1 then -- read info
-			if ift[1] == 3 then
+			if mp ~= 0 then
+				m.portA = 1
+				m.portB = mp
+				mp = 0
+			elseif mr ~= 0 then
+				m.portA = 2
+				m.portB = mr
+				mr = 0
+			elseif move ~= 0 then
+				m.portA = 3
+				m.portB = move
+				move = 0
 				dx = 0
 				dy = 0
+			else
+				m.portA = 0
 			end
-
-			m.portA = ift[1]
-			m.portB = ift[2]
 		elseif v == 2 then -- reset
 			ift = {}
 		end
@@ -62,20 +68,24 @@ function mouse.new(vm, c)
 		c.window.captureMouse = true
 
 		function c.window:mousepressed(x, y, button)
-			m.info(1, button)
+			mp = button
+			int()
 		end
 
 		function c.window:mousereleased(x, y, button)
 			if ignore then ignore = false return end
 
-			m.info(2, button)
+			mr = button
+			int()
 		end
 
 		function c.window:mousemoved(x, y, dxe, dye)
 			dx = dx + dxe
 			dy = dy + dye
 
-			m.info(3, bor(lshift(fmtn(dx), 16), fmtn(dy)))
+			move = bor(lshift(fmtn(dx), 16), fmtn(dy))
+
+			int()
 		end
 	end
 
