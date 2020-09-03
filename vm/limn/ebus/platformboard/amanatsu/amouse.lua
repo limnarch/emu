@@ -13,12 +13,12 @@ function mouse.new(vm, c)
 	local inf1 = 0
 	local inf2 = 0
 
-	local adx = 0
-	local ady = 0
+	local dx = 0
+	local dy = 0
 
 	local ignore = false
 
-	local ifs = {}
+	local ift = {}
 
 	local cint = c.int
 
@@ -30,31 +30,29 @@ function mouse.new(vm, c)
 
 	local function fmtn(n) -- two's complement
 		if n < 0 then
-			n = band(bnot(math.abs(n))+1, 0xFFFF)
+			n = bnot(math.abs(n))+1, 0xFFFF
 		end
 
-		return n
+		return band(n, 0xFFFF)
 	end
 
 	function m.info(i1, i2)
-		if #ifs >= 4 then
-			ifs[4] = nil
-		end
-
-		ifs[#ifs+1] = {i1, i2}
+		ift = {i1, i2}
 
 		int()
 	end
 
 	function m.action(v)
 		if v == 1 then -- read info
-			local ift = table.remove(ifs, 1) or {0,0}
+			if ift[1] == 3 then
+				dx = 0
+				dy = 0
+			end
+
 			m.portA = ift[1]
 			m.portB = ift[2]
 		elseif v == 2 then -- reset
-			ifs = {}
-			adx = 0
-			ady = 0
+			ift = {}
 		end
 
 		return true
@@ -73,25 +71,16 @@ function mouse.new(vm, c)
 			m.info(2, button)
 		end
 
-		function c.window:mousemoved(x, y, dx, dy)
-			adx = adx + dx
-			ady = ady + dy
-			
-			adx = math.min(adx, 0x7FFF)
-			adx = math.max(adx, -0x7FFF)
+		function c.window:mousemoved(x, y, dxe, dye)
+			dx = dx + dxe
+			dy = dy + dye
 
-			ady = math.min(ady, 0x7FFF)
-			ady = math.max(ady, -0x7FFF)
-
-			dx = fmtn(dx)
-			dy = fmtn(dy)
-
-			m.info(3, bor(lshift(dx, 16), dy))
+			m.info(3, bor(lshift(fmtn(dx), 16), fmtn(dy)))
 		end
 	end
 
 	function m.reset()
-		ifs = {}
+		ift = {}
 		adx = 0
 		ady = 0
 	end
