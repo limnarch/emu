@@ -23,6 +23,7 @@ vm.hz = 10000000
 vm.targetfps = 60
 vm.instructionsPerTick = 0
 vm.errPerTick = 0
+vm.scale = 1
 
 vm.cb = {}
 vm.cb.update = {}
@@ -86,11 +87,9 @@ function love.load(arg)
 		elseif arg[i] == "-asyncdev" then
 			timed = true
 			i = i + 1
-		elseif arg[i] == "-fbfs" then
-			if vm.computer.window then
-				window.fullscreen(vm.computer.window)
-			end
-			i = i + 1
+		elseif arg[i] == "-scale" then
+			vm.scale = tonumber(arg[i + 1])
+			i = i + 2
 		else
 			print("unrecognized option "..arg[i])
 			i = i + 1
@@ -149,7 +148,6 @@ function love.update(dt)
 		vct[i](dt)
 	end
 
-	--[[
 	local vtimed = vm.timed
 	local vtl = #vtimed
 	for i = 1, vtl do
@@ -162,7 +160,6 @@ function love.update(dt)
 			table.remove(vtimed, i)
 		end
 	end
-	]]
 
 	local m = ipt
 

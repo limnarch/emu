@@ -562,21 +562,23 @@ function w.getcsize()
 	return wi, he
 end
 
-function w.winterest()
+function w.winterest(scale)
+	scale = scale or 1
+
 	local ows = {}
 	ows.width, ows.height, ows.flags = love.window.getMode()
 
 	local wi,he = w.getcsize()
 
 	-- some hacks to keep the window centered (depends on platform's coordinates system being sane)
-	local wd = wi - ows.width
-	local hd = he - ows.height
+	local wd = wi*scale - ows.width
+	local hd = he*scale - ows.height
 
 	ows.flags.x = ows.flags.x - wd/2
 	ows.flags.y = ows.flags.y - hd/2
 
-	ows.width = wi 
-	ows.height = he
+	ows.width = wi*scale
+	ows.height = he*scale
 
 	-- ows.flags.borderless = true
 
