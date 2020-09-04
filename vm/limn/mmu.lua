@@ -59,8 +59,8 @@ function mmu.new(vm, c)
 
 	flags/physpage:
 
-	31 30 ............ 17 16 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
-	RW  P          N/A                                        Page
+	31 30 ............ 19 18 17 16 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
+	RW  P          N/A                                              Page
 
 	]]
 
@@ -69,7 +69,7 @@ function mmu.new(vm, c)
 
 	local SEGSHIFT = 30
 	local OFFMASK = 0x3FFFFFFF
-	local PHYSMASK = 0x3FFFF
+	local PHYSMASK = 0xFFFFF
 
 	local function translate(ptr, size, write)
 		local seg = rshift(ptr, SEGSHIFT)
