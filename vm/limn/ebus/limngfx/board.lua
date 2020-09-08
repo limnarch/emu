@@ -5,7 +5,7 @@
 -- 0000100-0001FFF: Driver ROM
 -- 0002000-00020FF: Display list
 -- 0003000-00030FF: Board registers
--- 0004000-00042FF: Cursor sprite bitmap
+-- 0004000-00047FF: Cursor sprite bitmap
 -- 0100000-04FFFFF: Minimum extent of VRAM
 
 local lshift, rshift, tohex, arshift, band, bxor, bor, bnot, bror, brol =
@@ -31,7 +31,7 @@ function gpu.new(vm, c, page, intn)
 
 	local vram = ffi.new("uint8_t[?]", vramsize)
 
-	local curbmp = ffi.new("uint8_t[512]")
+	local curbmp = ffi.new("uint8_t[2048]")
 
 	local displaylist = ffi.new("uint32_t[64]")
 
@@ -486,7 +486,7 @@ function gpu.new(vm, c, page, intn)
 			end
 
 			return driverrom:h(s, 0, offset - 0x100)
-		elseif (offset >= 0x4000) and (offset < 0x4400) then -- Cursor bitmap
+		elseif (offset >= 0x4000) and (offset < 0x4800) then -- Cursor bitmap
 			if t == 1 then
 				curdirty = true
 			end
@@ -563,29 +563,31 @@ function gpu.new(vm, c, page, intn)
 			local curh = band(rshift(registers[4], 12), 0xFFF)
 
 			if curdirty then
-				if curimage then
-					curimage:release()
-				end
-
-				local imageData = love.image.newImageData(curw, curh)
-
-				imageData:mapPixel(function (x,y,r,g,b,a)
-					local pix = min((y * curw * 2) + (x * 2), 256) * 2
-
-					local c = curbmp[pix+1] * 0x100 + curbmp[pix]
-
-					if band(c, 0x8000) == 0x8000 then
-						return 0,0,0,0
-					else
-						local e = palette[band(c, 0x7FFF)]
-
-						return e.r/255,e.g/255,e.b/255,1
+				if (curw * curh) < 1024 then
+					if curimage then
+						curimage:release()
 					end
-				end, 0, 0, curw, curh)
 
-				curimage = love.graphics.newImage(imageData)
+					local imageData = love.image.newImageData(curw, curh)
 
-				imageData:release()
+					imageData:mapPixel(function (x,y,r,g,b,a)
+						local pix = (y * curw * 2) + (x * 2)
+
+						local c = curbmp[pix+1] * 0x100 + curbmp[pix]
+
+						if band(c, 0x8000) == 0x8000 then
+							return 0,0,0,0
+						else
+							local e = palette[band(c, 0x7FFF)]
+
+							return e.r/255,e.g/255,e.b/255,1
+						end
+					end, 0, 0, curw, curh)
+
+					curimage = love.graphics.newImage(imageData)
+
+					imageData:release()
+				end
 
 				curdirty = false
 			end
