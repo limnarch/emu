@@ -624,10 +624,10 @@ function gpu.new(vm, c, page, intn)
 				dirty = false
 			end
 
-			if init then
-				love.graphics.setColor(1,1,1,1)
-				love.graphics.draw(image, x, y, 0)
-			else
+			love.graphics.setColor(1,1,1,1)
+			love.graphics.draw(image, x, y, 0)
+			
+			if not init then
 				love.graphics.setColor(0.5,0.2,0.3,1)
 				love.graphics.print("limngfx: vram not initialized by guest.", x + 10, y + 10)
 				love.graphics.setColor(1,1,1,1)
