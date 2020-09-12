@@ -37,6 +37,8 @@ function gpu.new(vm, c, page, intn)
 
 	local registers = ffi.new("uint32_t[64]")
 
+	local pixPerFrame = (vm.hz/60)*4
+
 	local regwritable = {
 		[0] = false,
 		[1] = false,
@@ -284,6 +286,96 @@ function gpu.new(vm, c, page, intn)
 	local destRectX = 0
 	local destRectY = 0
 
+	local runfunc = nil
+
+	local rfMode
+	local rfColor
+
+	local rfAddr1
+	local rfAddr2
+	local rfModulo1
+	local rfModulo2
+	local rfCount
+	local rfLines
+
+	local rfLastLine
+	local rfLastCount
+
+	local pixThisFrame = 0
+
+	local function deferredOPRECT(maxpixels)
+		local pixels = 0
+
+		for i = rfLastLine, rfLines do
+			dirtyLine(rfAddr1, rfCount-rfLastCount+1)
+
+			for j = rfLastCount, rfCount do
+				if pixels >= maxpixels then
+					pixThisFrame = pixThisFrame + pixels
+					return
+				end
+
+				local dc = bor(lshift(vram[rfAddr1 + 1], 8), vram[rfAddr1])
+
+				local c = operate(dc, rfColor, rfMode)
+
+				vram[rfAddr1] = band(c, 0xFF)
+				vram[rfAddr1 + 1] = rshift(c, 8)
+
+				rfAddr1 = rfAddr1 + 2
+				rfLastCount = rfLastCount + 1
+				pixels = pixels + 1
+			end
+
+			rfAddr1 = rfAddr1 + rfModulo1
+			rfLastLine = rfLastLine + 1
+			rfLastCount = 1
+		end
+
+		pixThisFrame = pixThisFrame + pixels
+
+		runfunc = nil
+	end
+
+	local function deferredBLITRECT(maxpixels)
+		local pixels = 0
+
+		for i = rfLastLine, rfLines do
+			dirtyLine(rfAddr1, rfCount-rfLastCount+1)
+
+			for j = rfLastCount, rfCount do
+				if pixels >= maxpixels then
+					pixThisFrame = pixThisFrame + pixels
+					return
+				end
+
+				local sc = bor(lshift(vram[rfAddr2 + 1], 8), vram[rfAddr2])
+				local dc = bor(lshift(vram[rfAddr1 + 1], 8), vram[rfAddr1])
+
+				if band(sc, 0x8000) == 0 then
+					local c = operate(band(dc, 0x7FFF), band(sc, 0x7FFF), rfMode)
+
+					vram[rfAddr1] = band(c, 0xFF)
+					vram[rfAddr1 + 1] = rshift(c, 8)
+				end
+
+				rfAddr1 = rfAddr1 + 2
+				rfAddr2 = rfAddr2 + 2
+				rfLastCount = rfLastCount + 1
+				pixels = pixels + 1
+			end
+
+			rfAddr1 = rfAddr1 + rfModulo1
+			rfAddr2 = rfAddr2 + rfModulo2
+			rfLastCount = 1
+			rfLastLine = rfLastLine + 1
+		end
+
+		pixThisFrame = pixThisFrame + pixels
+
+		runfunc = nil
+	end
+
 	local ops = {
 		[0x01] = function (inst) -- TEXSRCDIM
 			sourceTexW = band(inst, 0xFFF)
@@ -316,66 +408,35 @@ function gpu.new(vm, c, page, intn)
 			destRectY = band(rshift(inst, 12), 0xFFF)
 		end,
 		[0x09] = function (inst) -- OPRECT
-			local mode = band(inst, 0xF)
-			local color = band(rshift(inst, 4), 0x7FFF)
+			rfMode = band(inst, 0xF)
+			rfColor = band(rshift(inst, 4), 0x7FFF)
 
-			local addr = destTexAddr + (destRectY * destTexW * 2) + (destRectX * 2)
-			local modulo = math.abs(destTexW - destRectW) * 2
-			local count = destRectW
-			local lines = destRectH
+			rfAddr1 = destTexAddr + (destRectY * destTexW * 2) + (destRectX * 2)
+			rfModulo1 = math.abs(destTexW - destRectW) * 2
+			rfCount = destRectW
+			rfLines = destRectH
 
-			for i = 1, lines do
-				dirtyLine(addr, count)
+			rfLastLine = 1
+			rfLastCount = 1
 
-				for j = 1, count do
-					local dc = bor(lshift(vram[addr + 1], 8), vram[addr])
-
-					local c = operate(dc, color, mode)
-
-					vram[addr] = band(c, 0xFF)
-					vram[addr + 1] = rshift(c, 8)
-
-					addr = addr + 2
-				end
-
-				addr = addr + modulo
-			end
+			runfunc = deferredOPRECT
 		end,
 		[0x0A] = function (inst) -- BLITRECT
-			local mode = band(inst, 0xF)
+			rfMode = band(inst, 0xF)
 
-			local destaddr = destTexAddr + (destRectY * destTexW * 2) + (destRectX * 2)
-			local destmodulo = math.abs(destTexW - destRectW) * 2
+			rfAddr1 = destTexAddr + (destRectY * destTexW * 2) + (destRectX * 2)
+			rfModulo1 = math.abs(destTexW - destRectW) * 2
 
-			local srcaddr = sourceTexAddr + (sourceRectY * sourceTexW * 2) + (sourceRectX * 2)
-			local srcmodulo = math.abs(sourceTexW - sourceRectW) * 2
+			rfAddr2 = sourceTexAddr + (sourceRectY * sourceTexW * 2) + (sourceRectX * 2)
+			rfModulo2 = math.abs(sourceTexW - sourceRectW) * 2
 
-			local count = sourceRectW
-			local lines = sourceRectH
+			rfCount = sourceRectW
+			rfLines = sourceRectH
 
-			--print(destaddr, destmodulo, srcaddr, srcmodulo, count, lines)
+			rfLastLine = 1
+			rfLastCount = 1
 
-			for i = 1, lines do
-				dirtyLine(destaddr, count)
-
-				for j = 1, count do
-					local sc = bor(lshift(vram[srcaddr + 1], 8), vram[srcaddr])
-					local dc = bor(lshift(vram[destaddr + 1], 8), vram[destaddr])
-
-					if band(sc, 0x8000) == 0 then
-						local c = operate(band(dc, 0x7FFF), band(sc, 0x7FFF), mode)
-
-						vram[destaddr] = band(c, 0xFF)
-						vram[destaddr + 1] = rshift(c, 8)
-					end
-
-					destaddr = destaddr + 2
-					srcaddr = srcaddr + 2
-				end
-
-				destaddr = destaddr + destmodulo
-				srcaddr = srcaddr + srcmodulo
-			end
+			runfunc = deferredBLITRECT
 		end,
 		[0x0E] = function (inst) -- [DRAWLINE]
 			local mode = band(inst, 0xF)
@@ -445,6 +506,11 @@ function gpu.new(vm, c, page, intn)
 		local writecount = registers[3]
 
 		while (readcount < writecount) do
+			if runfunc then
+				registers[2] = readcount
+				break
+			end
+
 			local command = displaylist[readcount % 64]
 
 			local op = ops[band(command, 0x3F)]
@@ -458,6 +524,12 @@ function gpu.new(vm, c, page, intn)
 			end
 
 			readcount = readcount + 1
+
+			if runfunc then
+				if pixThisFrame < pixPerFrame then
+					runfunc(pixPerFrame-pixThisFrame)
+				end
+			end
 		end
 
 		registers[2] = readcount
@@ -649,6 +721,18 @@ function gpu.new(vm, c, page, intn)
 		wc.y = y
 
 		c.window:open()
+
+		vm.registerCallback("update", function (dt)
+			if runfunc then
+				if pixThisFrame < pixPerFrame then
+					runfunc(pixPerFrame-pixThisFrame)
+				end
+			elseif registers[2] < registers[3] then
+				executelist()
+			end
+
+			pixThisFrame = 0
+		end)
 
 		local fbdwindow = vm.window.new("!! SCREENSHOT !!", 100, 100)
 

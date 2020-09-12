@@ -61,8 +61,33 @@ s.bcanvas = love.graphics.newCanvas(fw * cw, fh * ch)
 s.x = 0
 s.y = 0
 
-s.bgc = {0x00/0xFF, 0x00/0xFF, 0x00/0xFF}
-s.fgc = {0xFF/0xFF, 0xFF/0xFF, 0xFF/0xFF}
+s.bgc = {0x30/0xFF, 0x30/0xFF, 0x50/0xFF}
+s.fgc = {0xF0/0xFF, 0xF0/0xFF, 0xF0/0xFF}
+
+local curbg = s.bgc
+local curfg = s.fgc
+
+local darkcolors = {
+	[0] = {0x19/0xFF,0x19/0xFF,0x19/0xFF},
+	[1] = {0xCC/0xFF,0x4C/0xFF,0x4C/0xFF},
+	[2] = {0x57/0xFF,0xA6/0xFF,0x4E/0xFF},
+	[3] = {0xDE/0xFF,0xDE/0xFF,0x6C/0xFF},
+	[4] = {0x33/0xFF,0x66/0xFF,0xCC/0xCC},
+	[5] = {0xE5/0xFF,0x7F/0xFF,0xD8/0xFF},
+	[6] = {0x00/0xFF,0xFF/0xFF,0xFF/0xFF},
+	[7] = {0x99/0xFF,0x99/0xFF,0x99/0xFF},
+}
+
+local brightcolors = {
+	[0] = {0x4C/0xFF,0x4C/0xFF,0x4C/0xFF},
+	[1] = {0xF2/0xFF,0xB2/0xFF,0xCC/0xFF},
+	[2] = {0x7F/0xFF,0xCC/0xFF,0x19/0xFF},
+	[3] = {0xDE/0xFF,0xDE/0xFF,0x6C/0xFF},
+	[4] = {0x99/0xFF,0xB2/0xFF,0xF2/0xFF},
+	[5] = {0x99/0xFF,0xB2/0xFF,0xF2/0xFF},
+	[6] = {0xB4/0xFF,0xFF/0xFF,0xFF/0xFF},
+	[7] = {0xF0/0xFF,0xF0/0xFF,0xF0/0xFF}
+}
 
 s.escape = false
 
@@ -91,7 +116,7 @@ end
 
 local function clear()
 	love.graphics.setCanvas(s.canvas)
-	love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
+	love.graphics.setColor(curbg[1], curbg[2], curbg[3], 1)
 	love.graphics.rectangle("fill", 0, 0, fw * cw, fh * ch)
 	love.graphics.setCanvas()
 	s.x = 0
@@ -121,19 +146,11 @@ end
 function s.drawc(c)
 	love.graphics.setCanvas(s.canvas)
 
-	if not s.inverted then
-		love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
-	else
-		love.graphics.setColor(s.fgc[1], s.fgc[2], s.fgc[3], 1)
-	end
+	love.graphics.setColor(curbg[1], curbg[2], curbg[3], 1)
 
 	love.graphics.rectangle("fill", s.x*fw,s.y*fh, fw, fh)
 
-	if s.inverted then
-		love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
-	else
-		love.graphics.setColor(s.fgc[1], s.fgc[2], s.fgc[3], 1)
-	end
+	love.graphics.setColor(curfg[1], curfg[2], curfg[3], 1)
 
 	local of = love.graphics.getFont()
 	love.graphics.setFont(s.font)
@@ -146,9 +163,25 @@ local escv = {0}
 
 local function color()
 	if escv[1] == 7 then
+		curfg = s.bgc
+		curbg = s.fgc
 		s.inverted = true
 	elseif escv[1] == 0 then
+		curfg = s.fgc
+		curbg = s.bgc
 		s.inverted = false
+	elseif escv[1] == 39 then
+		curfg = s.fgc
+	elseif escv[1] == 49 then
+		curbg = s.bgc
+	elseif (escv[1] >= 30) and (escv[1] <= 37) then
+		curfg = darkcolors[escv[1]-30]
+	elseif (escv[1] >= 40) and (escv[1] <= 47) then
+		curbg = darkcolors[escv[1]-40]
+	elseif (escv[1] >= 90) and (escv[1] <= 97) then
+		curfg = brightcolors[escv[1]-90]
+	elseif (escv[1] >= 100) and (escv[1] <= 107) then
+		curbg = brightcolors[escv[1]-100]
 	end
 end
 
