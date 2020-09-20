@@ -176,12 +176,12 @@ function cpu.new(vm, c)
 
 		local tlbe = tlb[base+1]
 
-		if (tlb[base] ~= vpn) or (band(tlb[base+1],1) == 0) then
+		if (tlb[base] ~= vpn) or (band(tlbe,1) == 0) then
 			base = base + 2
 			tlbe = tlb[base+1]
 			v = band(tlbe,1) == 1
 
-			if (tlb[base] ~= vpn) or (band(tlb[base+1],1) == 0) then
+			if (tlb[base] ~= vpn) or (band(tlbe,1) == 0) then
 				tlbrefill(ptr)
 				return false
 			end
@@ -1643,8 +1643,7 @@ function cpu.new(vm, c)
 
 			if band(tlb[base + 1],1) == 1 then
 				if band(tlb[base + 3],1) == 1 then
-					if band(r[41]+wtlbc,4) == 4 then
-						print("yeah offset")
+					if band(r[41]+wtlbc,1) == 1 then
 						base = base + 2
 					end
 				else
