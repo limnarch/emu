@@ -1832,11 +1832,11 @@ function cpu.new(vm, c)
 				return i
 			end
 
-			if timer and (r[41] > 0) then
+			if r[41] > 0 then
 				r[41] = r[41] - 1
 
 				if r[41] == 0 then
-					if not currentexception then
+					if (not currentexception) and (timer) then
 						exception(5)
 						p.timerticks = p.timerticks + 1
 					else
