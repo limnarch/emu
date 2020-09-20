@@ -52,6 +52,8 @@ function cpu.new(vm, c)
 
 	local tleft = 0
 
+	local wtlbc = 0
+
 	local translating = false
 
 	local function access(reg)
@@ -147,25 +149,52 @@ function cpu.new(vm, c)
 	p.tlb = ffi.new("uint32_t[128]")
 	local tlb = p.tlb
 
+	local Dlastvpn = nil
+	local Dlastvpnt = nil
+
+	local Ilastvpn = nil
+	local Ilastvpnt = nil
+
+	local ifetch = false
+
 	function p.translate(ptr, size, write)
-		if not translating then return ptr end
+		local off = band(ptr, 4095)
 
 		local vpn = rshift(ptr, 12)
-		local set = bor(rshift(vpn, 15), band(vpn, 7))
 
-		local base = set*4
+		if ifetch then
+			if vpn == Ilastvpn then
+				return Ilastvpnt + off
+			end
+		else
+			if vpn == Dlastvpn then
+				return Dlastvpnt + off
+			end
+		end
+
+		local base = lshift(bor(rshift(vpn, 15), band(vpn, 7)), 2)
+
 		local tlbe = tlb[base+1]
-		local v = band(tlbe,1) == 1
 
-		if (tlb[base] ~= vpn) or (not v) then
+		if (tlb[base] ~= vpn) or (band(tlb[base+1],1) == 0) then
 			base = base + 2
 			tlbe = tlb[base+1]
 			v = band(tlbe,1) == 1
+
+			if (tlb[base] ~= vpn) or (band(tlb[base+1],1) == 0) then
+				tlbrefill(ptr)
+				return false
+			end
 		end
 
-		if (tlb[base] ~= vpn) or (not v) then
-			tlbrefill(ptr)
-			return false
+		local vpnt = lshift(rshift(tlbe, 4), 12)
+
+		if ifetch then
+			Ilastvpn = vpn
+			Ilastvpnt = vpnt
+		else
+			Dlastvpn = vpn
+			Dlastvpnt = vpnt
 		end
 
 		if write and (band(tlbe, 2) == 0) then
@@ -173,11 +202,19 @@ function cpu.new(vm, c)
 			return false
 		end
 
-		return lshift(rshift(tlbe,4),12) + band(ptr, 4095)
+		return vpnt + off
 	end
 	local translate = p.translate
 
+	local function mT(ptr, size, write)
+		if not translating then return ptr end
+
+		return translate(ptr, size, write)
+	end
+
 	function p.fetchByte(ptr)
+		if not translating then return TfB(ptr, v) end
+
 		local v = translate(ptr, 1)
 
 		if v then
@@ -187,6 +224,8 @@ function cpu.new(vm, c)
 	local fB = p.fetchByte
 
 	function p.fetchInt(ptr)
+		if not translating then return TfI(ptr, v) end
+
 		local v = translate(ptr, 2)
 
 		if v then
@@ -196,6 +235,8 @@ function cpu.new(vm, c)
 	local fI = p.fetchInt
 
 	function p.fetchLong(ptr)
+		if not translating then return TfL(ptr, v) end
+
 		local v = translate(ptr, 4)
 
 		if v then
@@ -205,6 +246,8 @@ function cpu.new(vm, c)
 	local fL = p.fetchLong
 
 	function p.storeByte(ptr, v)
+		if not translating then return TsB(ptr, v) end
+
 		local ta = translate(ptr, 1, true)
 
 		if ta then
@@ -214,6 +257,8 @@ function cpu.new(vm, c)
 	local sB = p.storeByte
 
 	function p.storeInt(ptr, v)
+		if not translating then return TsI(ptr, v) end
+
 		local ta = translate(ptr, 2, true)
 
 		if ta then
@@ -223,6 +268,8 @@ function cpu.new(vm, c)
 	local sI = p.storeInt
 
 	function p.storeLong(ptr, v)
+		if not translating then return TsL(ptr, v) end
+
 		local ta = translate(ptr, 4, true)
 
 		if ta then
@@ -245,7 +292,7 @@ function cpu.new(vm, c)
 				return
 			end
 
-			r[dest] = fB(r[src1]+r[src2]) or 0
+			r[dest] = fB(r[src1]+r[src2]) or r[dest]
 
 			if dest == 36 then fillState(r[36]) end
 		end,
@@ -259,7 +306,7 @@ function cpu.new(vm, c)
 				return
 			end
 
-			r[dest] = fI(r[src1]+r[src2]) or 0
+			r[dest] = fI(r[src1]+r[src2]) or r[dest]
 
 			if dest == 36 then fillState(r[36]) end
 		end,
@@ -273,7 +320,7 @@ function cpu.new(vm, c)
 				return
 			end
 
-			r[dest] = fL(r[src1]+r[src2]) or 0
+			r[dest] = fL(r[src1]+r[src2]) or r[dest]
 
 			if dest == 36 then fillState(r[36]) end
 		end,
@@ -302,7 +349,7 @@ function cpu.new(vm, c)
 				return
 			end
 
-			r[dest] = fI(r[src1]+src2) or 0
+			r[dest] = fI(r[src1]+src2) or r[dest]
 
 			if dest == 36 then fillState(r[36]) end
 		end,
@@ -316,7 +363,7 @@ function cpu.new(vm, c)
 				return
 			end
 
-			r[dest] = fL(r[src1]+src2) or 0
+			r[dest] = fL(r[src1]+src2) or r[dest]
 
 			if dest == 36 then fillState(r[36]) end
 		end,
@@ -605,7 +652,7 @@ function cpu.new(vm, c)
 				return
 			end
 
-			r[dest] = fB(r[src1]+r[src2]) or 0
+			r[dest] = fB(r[src1]+r[src2]) or r[dest]
 			r[src1] = r[src1] + 1
 
 			if dest == 36 then fillState(r[36]) end
@@ -620,7 +667,7 @@ function cpu.new(vm, c)
 				return
 			end
 
-			r[dest] = fI(r[src1]+r[src2]) or 0
+			r[dest] = fI(r[src1]+r[src2]) or r[dest]
 			r[src1] = r[src1] + 2
 
 			if dest == 36 then fillState(r[36]) end
@@ -635,7 +682,7 @@ function cpu.new(vm, c)
 				return
 			end
 
-			r[dest] = fL(r[src1]+r[src2]) or 0
+			r[dest] = fL(r[src1]+r[src2]) or r[dest]
 			r[src1] = r[src1] + 4
 
 			if dest == 36 then fillState(r[36]) end
@@ -652,7 +699,7 @@ function cpu.new(vm, c)
 			local b
 
 			if translating then
-				b = translate(r[src1], 112)
+				b = mT(r[src1], 112)
 
 				if not b then
 					return
@@ -676,7 +723,7 @@ function cpu.new(vm, c)
 			local b
 
 			if translating then
-				b = translate(r[src1], 112)
+				b = mT(r[src1], 112)
 
 				if not b then
 					return
@@ -1594,12 +1641,23 @@ function cpu.new(vm, c)
 
 			local base = set*4
 
-			if band(r[41],1) == 1 then
-				base = base + 2
+			if band(tlb[base + 1],1) == 1 then
+				if band(tlb[base + 3],1) == 1 then
+					if band(r[41]+wtlbc,4) == 4 then
+						print("yeah offset")
+						base = base + 2
+					end
+				else
+					base = base + 2
+				end
 			end
+
+			wtlbc = wtlbc + 1
 
 			tlb[base] = vpn
 			tlb[base + 1] = r[ppnf]
+
+			--print(string.format("vpn=%8X ppnf=%8X set=%2d base=%3d", vpn, r[ppnf], set, base))
 		end,
 
 		[0x65] = function (addr, inst) -- [ftlb]
@@ -1611,6 +1669,9 @@ function cpu.new(vm, c)
 			for i = 0, 127 do
 				tlb[i] = 0
 			end
+
+			Ilastvpn = nil
+			Dlastvpn = nil
 		end,
 
 		[0x67] = function (addr, inst) -- [bt]
@@ -1744,7 +1805,11 @@ function cpu.new(vm, c)
 
 			r[31] = pc + 4
 
+			ifetch = true
+
 			local inst = fL(pc)
+
+			ifetch = false
 
 			if inst then
 				local eop = ops[band(inst, 0xFF)]
