@@ -41,7 +41,7 @@ function cpu.new(vm, c)
 
 	local calltrace = {}
 
-	p.regs = ffi.new("uint32_t[45]")
+	p.regs = ffi.new("uint32_t[46]")
 	local r = p.regs
 
 	r[42] = 0x80040000 -- cpuid
@@ -56,14 +56,24 @@ function cpu.new(vm, c)
 
 	local translating = false
 
+	local DlastASID = nil
+	local Dlastvpn = nil
+	local Dlastvpnt = nil
+
+	local IlastASID = nil
+	local Ilastvpn = nil
+	local Ilastvpnt = nil
+
+	local ifetch = false
+
 	local function access(reg)
-		return (((reg < 32) or kmode) and reg < 45)
+		return (((reg < 32) or kmode) and reg < 46)
 	end
 
 	local function accessdest(reg)
 		if (reg == 0) or (reg == 42) or (reg == 31) then return false end
 
-		return (((reg < 32) or kmode) and reg < 45)
+		return (((reg < 32) or kmode) and reg < 46)
 	end
 
 	local currentexception = nil
@@ -149,52 +159,52 @@ function cpu.new(vm, c)
 	p.tlb = ffi.new("uint32_t[128]")
 	local tlb = p.tlb
 
-	local Dlastvpn = nil
-	local Dlastvpnt = nil
-
-	local Ilastvpn = nil
-	local Ilastvpnt = nil
-
-	local ifetch = false
-
 	function p.translate(ptr, size, write)
 		local off = band(ptr, 4095)
 
 		local vpn = rshift(ptr, 12)
 
+		local myasid = r[45]
+
 		if ifetch then
-			if vpn == Ilastvpn then
+			if (myasid == IlastASID) and (vpn == Ilastvpn) then
 				return Ilastvpnt + off
 			end
 		else
-			if vpn == Dlastvpn then
+			if (myasid == DlastASID) and (vpn == Dlastvpn) then
 				return Dlastvpnt + off
 			end
 		end
 
-		local base = lshift(bor(rshift(vpn, 15), band(vpn, 7)), 2)
+		local base = lshift(band((bor(rshift(vpn, 15), band(vpn, 7))+myasid), 31), 2)
 
 		local tlbe = tlb[base+1]
+		local tlbvpn = band(tlb[base], 0xFFFFF)
+		local asid = rshift(tlb[base], 20)
 
-		if (tlb[base] ~= vpn) or (band(tlbe,1) == 0) then
+		if (tlbvpn ~= vpn) or (band(tlbe,1) == 0) or (asid ~= myasid) then
 			base = base + 2
 			tlbe = tlb[base+1]
+			tlbvpn = band(tlb[base], 0xFFFFF)
+			asid = rshift(tlb[base], 20)
 			v = band(tlbe,1) == 1
 
-			if (tlb[base] ~= vpn) or (band(tlbe,1) == 0) then
+			if (tlbvpn ~= vpn) or (band(tlbe,1) == 0) or (asid ~= myasid) then
 				tlbrefill(ptr)
 				return false
 			end
 		end
 
-		local vpnt = lshift(rshift(tlbe, 4), 12)
+		local ppnt = lshift(rshift(tlbe, 4), 12)
 
 		if ifetch then
 			Ilastvpn = vpn
-			Ilastvpnt = vpnt
+			Ilastvpnt = ppnt
+			IlastASID = myasid
 		else
 			Dlastvpn = vpn
-			Dlastvpnt = vpnt
+			Dlastvpnt = ppnt
+			DlastASID = myasid
 		end
 
 		if write and (band(tlbe, 2) == 0) then
@@ -202,7 +212,7 @@ function cpu.new(vm, c)
 			return false
 		end
 
-		return vpnt + off
+		return ppnt + off
 	end
 	local translate = p.translate
 
@@ -1636,10 +1646,12 @@ function cpu.new(vm, c)
 				return
 			end
 
-			local vpn = rshift(r[vaddr], 12)
-			local set = bor(rshift(vpn, 15), band(vpn, 7))
+			local asid = r[45]
 
-			local base = set*4
+			local vpn = rshift(r[vaddr], 12)
+			local set = band((bor(rshift(vpn, 15), band(vpn, 7))+asid), 31)
+
+			local base = lshift(set, 2)
 
 			if band(tlb[base + 1],1) == 1 then
 				if band(tlb[base + 3],1) == 1 then
@@ -1653,10 +1665,10 @@ function cpu.new(vm, c)
 
 			wtlbc = wtlbc + 1
 
-			tlb[base] = vpn
+			tlb[base] = bor(lshift(asid, 20), vpn)
 			tlb[base + 1] = r[ppnf]
 
-			--print(string.format("vpn=%8X ppnf=%8X set=%2d base=%3d", vpn, r[ppnf], set, base))
+			--print(string.format("vpn=%8X ppnf=%8X set=%2d base=%3d asid=%4d", vpn, r[ppnf], set, base, asid))
 		end,
 
 		[0x65] = function (addr, inst) -- [ftlb]
@@ -1665,12 +1677,31 @@ function cpu.new(vm, c)
 				return
 			end
 
-			for i = 0, 127 do
-				tlb[i] = 0
+			local asid = band(inst, 0xFF)
+
+			if (not access(asid)) then
+				exception(8)
+				return
 			end
 
-			Ilastvpn = nil
-			Dlastvpn = nil
+			local a = r[asid]
+
+			for i = 0, 127, 2 do
+				if rshift(tlb[i], 20) == a then 
+					tlb[i] = 0
+					tlb[i+1] = 0
+				end
+			end
+
+			if IlastASID == a then
+				Ilastvpn = nil
+				IlastASID = nil
+			end
+
+			if DlastASID == a then
+				Dlastvpn = nil
+				DlastASID = nil
+			end
 		end,
 
 		[0x67] = function (addr, inst) -- [bt]
@@ -1899,6 +1930,7 @@ function cpu.new(vm, c)
 		"cpuid",
 		"badaddr",
 		"tlbv",
+		"asid",
 	}
 
 	p.loffs = {}
@@ -1918,8 +1950,8 @@ function cpu.new(vm, c)
 	function p.mkrs()
 		local s = ""
 
-		for i = 0, 44 do
-			s = s .. string.format("%s = $%X", p.regmnem[i+1], r[i]) .. "\n"
+		for i = 0, 45 do
+			s = s .. string.format("%8s %-8X", p.regmnem[i+1], r[i]) .. "\n"
 
 			if (i == 31) or (i == 38) or (i == 37) or (i == 30) then
 				local sym,off = p.loffsym(r[i])
@@ -1931,11 +1963,76 @@ function cpu.new(vm, c)
 
 		--s = s .. string.format("queue depth = %d", #intq) .. "\n"
 
+		--[[
 		if p.lastfaultaddr then
-			s = s .. string.format("last fault @ 0x%X", p.lastfaultaddr) .. "\n"
+			s = s .. string.format("\n%12s %X", "last fault pc", p.lastfaultaddr) .. "\n"
 
 			if p.lastfaultsym then
 				s = s .. gsymstr(p.lastfaultsym,p.lastfaultoff) .. "\n"
+			end
+		end
+		]]
+
+		return s
+	end
+
+	function p.mktlbs()
+		local s = ""
+
+		local i = 0
+		local nset = 2
+
+		local done = 0
+
+		local fmt = "[VP=%05X P=%05X AS=%04d FL=%02d] "
+
+		local fmtl = #string.format(fmt, 0, 0, 0, 0)
+
+		local spaces = ""
+		local dashes = ""
+
+		for i = 1, fmtl do
+			spaces = spaces .. " "
+			dashes = dashes .. " "
+		end
+
+		dashes = dashes .. dashes
+
+		while true do
+			if done >= 64 then
+				break
+			end
+
+			local tlblo = tlb[i]
+			local tlbhi = tlb[i+1]
+
+			local tlbvpn = band(tlblo, 0xFFFFF)
+			local asid = rshift(tlblo, 20)
+
+			local ppn = rshift(tlbhi, 4)
+			local flags = band(tlbhi, 15)
+
+			if band(tlbhi,1) == 1 then
+				s = s .. string.format(fmt, tlbvpn, ppn, asid, flags)
+			else
+				s = s .. spaces
+			end
+
+			done = done + 1
+
+			if (done ~= 1) and ((done % 2) == 0) then
+				s = s .. "\n"
+
+				if (done % 4) == 0 then
+					i = i + 2
+					s = s .. dashes .. "\n"
+				else
+					i = nset
+				end
+
+				nset = i + 2
+			else
+				i = i + 4
 			end
 		end
 
@@ -1953,9 +2050,12 @@ function cpu.new(vm, c)
 	end)
 
 	if vm.window then
-		p.window = vm.window.new("CPU Info", 10*25, 10*45)
+		p.window = vm.window.new("CPU Registers", 10*15, 10*40)
 
 		local function draw(_, dx, dy)
+			love.graphics.setColor(1,1,1,1)
+			love.graphics.rectangle("fill", dx, dy, 10*15, 10*40+20)
+			love.graphics.setColor(0,0,0,1)
 			love.graphics.print(p.mkrs(), dx, dy)
 		end
 
@@ -1967,9 +2067,8 @@ function cpu.new(vm, c)
 			if key == "return" then
 				running = not running
 
-				if halted then
+				if running and halted then
 					halted = false
-					running = true
 				end
 			elseif key == "escape" then
 				userbreak = true
@@ -1979,6 +2078,17 @@ function cpu.new(vm, c)
 				p.reset()
 			end
 		end
+
+		p.tlbwindow = vm.window.new("TLB", 10*55, 10*44)
+
+		local wc = p.tlbwindow:addElement(window.canvas(p.tlbwindow, function (_, dx, dy)
+			love.graphics.setColor(0,0,0,1)
+			love.graphics.rectangle("fill", dx, dy, 10*55, 10*44+20)
+			love.graphics.setColor(1,1,1,1)
+			love.graphics.print(p.mktlbs(), dx+8, dy+20)
+		end, p.tlbwindow.w, p.tlbwindow.h))
+		wc.x = 0
+		wc.y = 20
 
 		--p.window.open(p.window)
 	end
