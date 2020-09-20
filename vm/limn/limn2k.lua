@@ -21,25 +21,15 @@ function cpu.new(vm, c)
 
 	p.timerticks = 0
 
-	local mmu = c.mmu
+	local bus = c.bus
 
-	local TfB = mmu.TfetchByte
-	local TfI = mmu.TfetchInt
-	local TfL = mmu.TfetchLong
+	local TfB = bus.fetchByte
+	local TfI = bus.fetchInt
+	local TfL = bus.fetchLong
 
-	local TsB = mmu.TstoreByte
-	local TsI = mmu.TstoreInt
-	local TsL = mmu.TstoreLong
-
-	local fB = mmu.fetchByte
-	local fI = mmu.fetchInt
-	local fL = mmu.fetchLong
-
-	local sB = mmu.storeByte
-	local sI = mmu.storeInt
-	local sL = mmu.storeLong
-
-	local mT = mmu.translate
+	local TsB = bus.storeByte
+	local TsI = bus.storeInt
+	local TsL = bus.storeLong
 
 	local running = true
 
@@ -51,10 +41,10 @@ function cpu.new(vm, c)
 
 	local calltrace = {}
 
-	p.regs = ffi.new("uint32_t[44]")
+	p.regs = ffi.new("uint32_t[45]")
 	local r = p.regs
 
-	r[42] = 0x80030000 -- cpuid
+	r[42] = 0x80040000 -- cpuid
 
 	local intmode = false
 
@@ -62,14 +52,16 @@ function cpu.new(vm, c)
 
 	local tleft = 0
 
+	local translating = false
+
 	local function access(reg)
-		return (((reg < 32) or kmode) and reg < 44)
+		return (((reg < 32) or kmode) and reg < 45)
 	end
 
 	local function accessdest(reg)
 		if (reg == 0) or (reg == 42) or (reg == 31) then return false end
 
-		return (((reg < 32) or kmode) and reg < 44)
+		return (((reg < 32) or kmode) and reg < 45)
 	end
 
 	local currentexception = nil
@@ -89,18 +81,25 @@ function cpu.new(vm, c)
 
 		currentexception = n
 
-		--error(string.format("%X %X", n, r[31]))
-
 		--running = false
 
 		--print(string.format("%x", fL(r[31]-4)))
 	end
 	local exception = p.exception
 
-	function p.pagefault(ptr)
+	function p.tlbrefill(ptr)
 		exception(3)
 		r[43] = ptr
+		r[32] = lshift(rshift(ptr,22),2)
+		r[33] = band(rshift(ptr,12),4095)
 	end
+	local tlbrefill = p.tlbrefill
+
+	function p.pagefault(ptr)
+		exception(12)
+		r[43] = ptr
+	end
+	local pagefault = p.pagefault
 
 	function p.buserror(ptr)
 		exception(4)
@@ -130,9 +129,9 @@ function cpu.new(vm, c)
 		end
 
 		if getBit(s, 2) == 1 then
-			mmu.translating = true
+			translating = true
 		else
-			mmu.translating = false
+			translating = false
 		end
 
 		if getBit(s, 3) == 1 then
@@ -144,6 +143,93 @@ function cpu.new(vm, c)
 		r[36] = band(s, 0x7FFFFFFF)
 	end
 	local fillState = p.fillState
+
+	p.tlb = ffi.new("uint32_t[128]")
+	local tlb = p.tlb
+
+	function p.translate(ptr, size, write)
+		if not translating then return ptr end
+
+		local vpn = rshift(ptr, 12)
+		local set = bor(rshift(vpn, 15), band(vpn, 7))
+
+		local base = set*4
+		local tlbe = tlb[base+1]
+		local v = band(tlbe,1) == 1
+
+		if (tlb[base] ~= vpn) or (not v) then
+			base = base + 2
+			tlbe = tlb[base+1]
+			v = band(tlbe,1) == 1
+		end
+
+		if (tlb[base] ~= vpn) or (not v) then
+			tlbrefill(ptr)
+			return false
+		end
+
+		if write and (band(tlbe, 2) == 0) then
+			pagefault(12)
+			return false
+		end
+
+		return lshift(rshift(tlbe,4),12) + band(ptr, 4095)
+	end
+	local translate = p.translate
+
+	function p.fetchByte(ptr)
+		local v = translate(ptr, 1)
+
+		if v then
+			return TfB(translate(ptr, 1))
+		end
+	end
+	local fB = p.fetchByte
+
+	function p.fetchInt(ptr)
+		local v = translate(ptr, 2)
+
+		if v then
+			return TfI(v)
+		end
+	end
+	local fI = p.fetchInt
+
+	function p.fetchLong(ptr)
+		local v = translate(ptr, 4)
+
+		if v then
+			return TfL(v)
+		end
+	end
+	local fL = p.fetchLong
+
+	function p.storeByte(ptr, v)
+		local ta = translate(ptr, 1, true)
+
+		if ta then
+			return TsB(ta, v)
+		end
+	end
+	local sB = p.storeByte
+
+	function p.storeInt(ptr, v)
+		local ta = translate(ptr, 2, true)
+
+		if ta then
+			return TsI(ta, v)
+		end
+	end
+	local sI = p.storeInt
+
+	function p.storeLong(ptr, v)
+		local ta = translate(ptr, 4, true)
+
+		if ta then
+			return TsL(ta, v)
+		end
+	end
+	local sL = p.storeLong
 
 	local ops = {
 		[0x00] = function (addr, inst) -- [nop]
@@ -563,10 +649,16 @@ function cpu.new(vm, c)
 				return
 			end
 
-			local b = mT(r[src1], 112)
+			local b
 
-			if not b then
-				return
+			if translating then
+				b = translate(r[src1], 112)
+
+				if not b then
+					return
+				end
+			else
+				b = r[src1]
 			end
 
 			for i = 1, 28 do
@@ -581,10 +673,16 @@ function cpu.new(vm, c)
 				return
 			end
 
-			local b = mT(r[src1], 112)
+			local b
 
-			if not b then
-				return
+			if translating then
+				b = translate(r[src1], 112)
+
+				if not b then
+					return
+				end
+			else
+				b = r[src1]
 			end
 
 			for i = 1, 28 do
@@ -1477,6 +1575,44 @@ function cpu.new(vm, c)
 			halted = true
 		end,
 
+		[0x64] = function (addr, inst) -- [wtlb]
+			if not kmode then
+				exception(8)
+				return
+			end
+
+			local vaddr = band(inst, 0xFF)
+			local ppnf = band(rshift(inst, 8), 0xFF)
+
+			if (not access(vaddr)) or (not access(ppnf)) then
+				exception(8)
+				return
+			end
+
+			local vpn = rshift(r[vaddr], 12)
+			local set = bor(rshift(vpn, 15), band(vpn, 7))
+
+			local base = set*4
+
+			if band(r[41],1) == 1 then
+				base = base + 2
+			end
+
+			tlb[base] = vpn
+			tlb[base + 1] = r[ppnf]
+		end,
+
+		[0x65] = function (addr, inst) -- [ftlb]
+			if not kmode then
+				exception(8)
+				return
+			end
+
+			for i = 0, 127 do
+				tlb[i] = 0
+			end
+		end,
+
 		[0x67] = function (addr, inst) -- [bt]
 			if r[28] ~= 0 then
 				return addr + twx(lshift(inst, 2))
@@ -1570,7 +1706,14 @@ function cpu.new(vm, c)
 
 		for i = 1, t do
 			if currentexception or (intmode and intc.interrupting) then
-				local ev = r[37]
+				local ev
+
+				if currentexception == 3 then
+					ev = r[44]
+					r[31] = r[31] - 4
+				else
+					ev = r[37]
+				end
 
 				if band(ev, 2) ~= 0 then
 					print("unaligned exception vector, resetting")
@@ -1599,13 +1742,14 @@ function cpu.new(vm, c)
 
 			local pc = r[31]
 
+			r[31] = pc + 4
+
 			local inst = fL(pc)
 
 			if inst then
 				local eop = ops[band(inst, 0xFF)]
 
 				if eop then
-					r[31] = pc + 4
 					r[31] = eop(pc, rshift(inst, 8)) or r[31]
 					tleft = tleft - 1
 				else
@@ -1690,6 +1834,7 @@ function cpu.new(vm, c)
 		"timer",
 		"cpuid",
 		"badaddr",
+		"tlbv",
 	}
 
 	p.loffs = {}
@@ -1709,7 +1854,7 @@ function cpu.new(vm, c)
 	function p.mkrs()
 		local s = ""
 
-		for i = 0, 43 do
+		for i = 0, 44 do
 			s = s .. string.format("%s = $%X", p.regmnem[i+1], r[i]) .. "\n"
 
 			if (i == 31) or (i == 38) or (i == 37) or (i == 30) then

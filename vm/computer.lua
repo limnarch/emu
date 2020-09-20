@@ -9,7 +9,6 @@ function computer.new(vm, memsize)
 
 	-- chipset
 	c.bus = require("limn/ebus").new(vm, c, true)
-	c.mmu = require("limn/mmu").new(vm, c)
 	c.cpu = require("limn/limn2k").new(vm, c)
 
 	c.bus.insertBoard(31, "platformboard")
