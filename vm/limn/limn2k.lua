@@ -1984,7 +1984,7 @@ function cpu.new(vm, c)
 
 		local done = 0
 
-		local fmt = "[VP=%05X P=%05X AS=%04d FL=%02d] "
+		local fmt = "[VP=%05X P=%05X AS=%03x FL=%01x] "
 
 		local fmtl = #string.format(fmt, 0, 0, 0, 0)
 
@@ -2079,11 +2079,11 @@ function cpu.new(vm, c)
 			end
 		end
 
-		p.tlbwindow = vm.window.new("TLB", 10*55, 10*44)
+		p.tlbwindow = vm.window.new("TLB", 10*51, 10*44)
 
 		local wc = p.tlbwindow:addElement(window.canvas(p.tlbwindow, function (_, dx, dy)
 			love.graphics.setColor(0,0,0,1)
-			love.graphics.rectangle("fill", dx, dy, 10*55, 10*44+20)
+			love.graphics.rectangle("fill", dx, dy, 10*51, 10*44+20)
 			love.graphics.setColor(1,1,1,1)
 			love.graphics.print(p.mktlbs(), dx+8, dy+20)
 		end, p.tlbwindow.w, p.tlbwindow.h))
