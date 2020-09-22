@@ -103,7 +103,7 @@ function cpu.new(vm, c)
 		exception(3)
 		r[43] = ptr
 		r[32] = lshift(rshift(ptr,22),2)
-		r[33] = band(rshift(ptr,12),4095)
+		r[33] = lshift(band(rshift(ptr,12),1023),2)
 	end
 	local tlbrefill = p.tlbrefill
 
@@ -187,7 +187,6 @@ function cpu.new(vm, c)
 			tlbe = tlb[base+1]
 			tlbvpn = band(tlb[base], 0xFFFFF)
 			asid = rshift(tlb[base], 20)
-			v = band(tlbe,1) == 1
 
 			if (tlbvpn ~= vpn) or (band(tlbe,1) == 0) or (asid ~= myasid) then
 				tlbrefill(ptr)
@@ -1678,18 +1677,44 @@ function cpu.new(vm, c)
 			end
 
 			local asid = band(inst, 0xFF)
+			local vpn = band(rshift(inst, 8), 0xFF)
 
-			if (not access(asid)) then
+			if (not access(asid)) or (not access(vpn)) then
 				exception(8)
 				return
 			end
 
 			local a = r[asid]
+			local v = r[vpn]
 
-			for i = 0, 127, 2 do
-				if rshift(tlb[i], 20) == a then 
-					tlb[i] = 0
-					tlb[i+1] = 0
+			if v == 0xFFFFFFFF then
+				for i = 0, 127, 2 do
+					if rshift(tlb[i], 20) == a then
+						tlb[i] = 0
+						tlb[i+1] = 0
+					end
+				end
+			else
+				local base = lshift(band((bor(rshift(r[vpn], 15), band(r[vpn], 7))+r[asid]), 31), 2)
+
+				local tlbe = tlb[base+1]
+				local tlbvpn = band(tlb[base], 0xFFFFF)
+				local asid = rshift(tlb[base], 20)
+
+				if (tlbvpn ~= v) or (asid ~= a) then
+					base = base + 2
+					tlbe = tlb[base+1]
+					tlbvpn = band(tlb[base], 0xFFFFF)
+					asid = rshift(tlb[base], 20)
+
+					if (tlbvpn ~= v) or (asid ~= a) then
+						base = nil
+					end
+				end
+
+				if base then
+					tlb[base] = 0
+					tlb[base+1] = 0
 				end
 			end
 
