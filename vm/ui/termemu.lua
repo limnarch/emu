@@ -211,6 +211,8 @@ function s.putc(c)
 		return
 	end
 
+	local cb = string.byte(c)
+
 	if c == string.char(0xA) then
 		nl()
 	elseif c == string.char(0x8) then
@@ -234,7 +236,7 @@ function s.putc(c)
 		if s.x >= cw then
 			nl()
 		end
-	else
+	elseif (cb >= 0x20) and (cb <= 0x7F) then
 		s.drawc(c)
 
 		s.x = s.x + 1
