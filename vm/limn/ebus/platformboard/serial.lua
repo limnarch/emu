@@ -120,8 +120,10 @@ function serial.new(vm, c, bus)
 
 		vm.registerCallback("update", function (dt)
 			local x = love.thread.getChannel("serialin"):pop()
-			if x then
+			while x do
 				s.stream(x)
+
+				x = love.thread.getChannel("serialin"):pop()
 			end
 		end)
 

@@ -2101,6 +2101,8 @@ function cpu.new(vm, c)
 				halted = false
 				running = true
 				p.reset()
+			elseif key == "c" then
+				collectgarbage()
 			end
 		end
 
