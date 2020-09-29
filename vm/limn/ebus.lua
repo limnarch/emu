@@ -79,7 +79,7 @@ function bus.new(vm, c, aligned)
 	end
 
 	function b.fetchInt(ptr)
-		if aligned and (band(ptr, 1) ~= 0) then
+		if band(ptr, 1) ~= 0 then
 			c.cpu.unaligned(ptr)
 			return false
 		end
@@ -96,7 +96,7 @@ function bus.new(vm, c, aligned)
 	end
 
 	function b.fetchLong(ptr)
-		if aligned and (band(ptr, 3) ~= 0) then
+		if band(ptr, 3) ~= 0 then
 			c.cpu.unaligned(ptr)
 			return false
 		end
@@ -128,7 +128,7 @@ function bus.new(vm, c, aligned)
 	end
 
 	function b.storeInt(ptr, v)
-		if aligned and (band(ptr, 1) ~= 0) then
+		if band(ptr, 1) ~= 0 then
 			c.cpu.unaligned(ptr)
 			return false
 		end
@@ -144,7 +144,7 @@ function bus.new(vm, c, aligned)
 	end
 
 	function b.storeLong(ptr, v)
-		if aligned and (band(ptr, 3) ~= 0) then
+		if band(ptr, 3) ~= 0 then
 			c.cpu.unaligned(ptr)
 			return false
 		end
