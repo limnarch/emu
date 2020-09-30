@@ -237,12 +237,13 @@ function s.putc(c)
 			nl()
 		end
 	elseif (cb >= 0x20) and (cb <= 0x7F) then
-		s.drawc(c)
-
-		s.x = s.x + 1
 		if s.x == cw then
 			nl()
 		end
+
+		s.drawc(c)
+
+		s.x = s.x + 1
 	end
 end
 
