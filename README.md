@@ -1,8 +1,6 @@
-# LIMNvm
+# LIMNemu
 
 Emulates the LIMNstation fantasy computer, inspired by late 80s Unix workstations.
-
-Emulates at a low level the limn2k CPU, chipset, 8-bit framebuffer, a virtual disk bus, a keyboard, mouse, etc
 
 The virtual machine's user interface is a simple windowed experience. You can open various windows for different components by right clicking anywhere on the background.
 
