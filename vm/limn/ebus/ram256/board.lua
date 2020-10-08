@@ -11,6 +11,10 @@ function ram256.new(vm, c, branch, intn, memsize)
 	ram.physmem = ffi.new("uint8_t[?]", memsize)
 	local physmem = ram.physmem
 
+	--for i = 0, memsize-1 do
+	--	physmem[i] = math.floor(math.random()*256)
+	--end
+
 	c.bus.ram = physmem
 
 	function ram.handler(s, t, offset, v)

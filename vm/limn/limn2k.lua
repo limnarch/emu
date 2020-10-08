@@ -1718,10 +1718,17 @@ function cpu.new(vm, c)
 			local v = r[vpn]
 
 			if v == 0xFFFFFFFF then
-				for i = 0, 127, 2 do
-					if rshift(tlb[i], 20) == a then
+				if a == 0xFFFFFFFF then
+					for i = 0, 127, 2 do
 						tlb[i] = 0
 						tlb[i+1] = 0
+					end
+				else
+					for i = 0, 127, 2 do
+						if rshift(tlb[i], 20) == a then
+							tlb[i] = 0
+							tlb[i+1] = 0
+						end
 					end
 				end
 			else
