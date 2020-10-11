@@ -6,7 +6,7 @@ local keydev = {}
 --  1: get last key pressed
 -- portA: data
 
--- raises interrupt when a key is pressed
+-- raises interrupt when a key is pressed or released
 
 local layout = {}
 layout.l = {}
@@ -35,7 +35,7 @@ layout.l = {
 	'[', -- 41
 	']', -- 42
 	'\\', -- 43
-	'RESERVED', -- 44
+	'', -- 44
 	'/', -- 45
 	'.', -- 46
 	'\'', -- 47
@@ -78,7 +78,7 @@ layout.m["kp9"] = 35
 function keydev.new(vm, c)
 	local kbd = {}
 
-	kbd.mid = 0x8FC48FC4
+	kbd.mid = 0x8FC48FC5
 
 	local cint = c.int
 
@@ -88,30 +88,50 @@ function keydev.new(vm, c)
 		end
 	end
 
-	local ctrl = false
-	local shift = false
-
-	local lastkey = 0xFFFF
-
 	kbd.portA = 0xFFFF
 	kbd.portB = 0
 
+	local pressed = {}
+	local outstandingp = {}
+	local outstandingr = {}
+
 	function kbd.action(v)
 		if v == 1 then -- pop scancode
-			if ctrl then
-				kbd.portA = 0xF1
-				ctrl = false
-			elseif shift then
-				kbd.portA = 0xF0
-				shift = false
-			else
-				kbd.portA = lastkey
-				lastkey = 0xFFFF
+			for k,v in pairs(outstandingr) do
+				if v then
+					kbd.portA = bor(k, 0x8000)
+					outstandingp[k] = false
+					outstandingr[k] = false
+					return true
+				end
 			end
+			for k,v in pairs(outstandingp) do
+				if v then
+					kbd.portA = k
+					outstandingp[k] = false
+					return true
+				end
+			end
+			for k,v in pairs(layout.m) do -- this is necessary because sometimes love2d misses keystrokes and we must compensate. why!!
+				if #k > 0 then
+					local down = love.keyboard.isDown(k)
+
+					if pressed[v] ~= down then
+						if down then
+							pressed[v] = true
+							kbd.portA = v
+						else
+							pressed[v] = false
+							kbd.portA = bor(v, 0x8000)
+						end
+					end
+				end
+			end
+			kbd.portA = 0xFFFF
 		elseif v == 2 then -- reset
-			lastkey = 0xFFFF
-			shift = false
-			ctrl = false
+			outstandingp = {}
+			outstandingr = {}
+			pressed = {}
 		elseif v == 3 then -- check key pressed
 			if layout.l[kbd.portA] then
 				if love.keyboard.isDown(layout.l[kbd.portA]) then
@@ -130,28 +150,25 @@ function keydev.new(vm, c)
 	if c.window then
 		function c.window.keypressed(key, t)
 			if layout.m[t] then
-				if layout.m[t] < 80 then
-					int()
-					if love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift") then
-						shift = true
-						ctrl = false
-					elseif love.keyboard.isDown("lctrl") then
-						ctrl = true
-						shift = false
-					else
-						ctrl = false
-						shift = false
-					end
-					lastkey = layout.m[t]
-				end
+				int()
+				outstandingp[layout.m[t]] = true
+				pressed[layout.m[t]] = true
+			end
+		end
+
+		function c.window.keyreleased(key, t)
+			if layout.m[t] then
+				int()
+				outstandingr[layout.m[t]] = true
+				pressed[layout.m[t]] = false
 			end
 		end
 	end
 
 	function kbd.reset()
-		lastkey = 0xFFFF
-		shift = false
-		ctrl = false
+		outstandingp = {}
+		outstandingr = {}
+		pressed = {}
 	end
 
 	return kbd
