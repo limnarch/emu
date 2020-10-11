@@ -83,11 +83,11 @@ function cpu.new(vm, c)
 			error("double exception, shouldnt ever happen")
 		end
 
-		if (n ~= 5) and (n ~= 1) then -- fault, do some debug info
-			p.lastfaultaddr = r[31]
+		--if (n ~= 5) and (n ~= 1) then -- fault, do some debug info
+		--	p.lastfaultaddr = r[31]
 
-			p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
-		end
+		--	p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
+		--end
 
 		--p.dumpcalls(20)
 
@@ -1869,12 +1869,12 @@ function cpu.new(vm, c)
 				end
 
 				if band(ev, 2) ~= 0 then
-					print("unaligned exception vector, resetting")
+					--print("unaligned exception vector, resetting")
 					p.reset()
 				end
 
 				if ev == 0 then
-					print("exception but no exception vector, resetting")
+					--print("exception but no exception vector, resetting")
 					currentexception = nil
 					p.reset()
 				else
