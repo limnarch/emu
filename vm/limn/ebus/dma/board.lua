@@ -45,27 +45,40 @@ function dmacon.new(vm, c, branch, intn, memsize)
 
 		for line = 0, lines - 1 do
 			local odest = dest
+			local osrc = source
 
 			for i = 0, count - 1 do
 				local b = readByte(source)
 
+				--print(line, lines, i, count, source, dest, dinc, sinc, b)
+
 				if not b then return false end
+
+				local bt = dest
 
 				if direction == 0 then
 					for j = 0, 7 do
-						if (band(rshift(b, j), 1) == 1) and (setint ~= 0xFFFFFFFF) then
-							if not writeInt(dest + j*2, setint) then return false end
+						if (band(rshift(b, j), 1) == 1) then
+							if setint ~= 0xFFFFFFFF then
+								if not writeInt(bt, setint) then return false end
+							end
 						elseif clearint ~= 0xFFFFFFFF then
-							if not writeInt(dest + j*2, clearint) then return false end
+							if not writeInt(bt, clearint) then return false end
 						end
+
+						bt = bt + 2
 					end
-				elseif direction == 1 then -- this doesnt actually work because apparently I don't understand bitwise math, will fix later
-					for j = 0, 7 do
-						if (band(rshift(b, 7-j), 1) == 1) and (setint ~= 0xFFFFFFFF) then
-							if not writeInt(dest + j*2, setint) then return false end
+				elseif direction == 1 then
+					for j = 7, 0, -1 do
+						if (band(rshift(b, j), 1) == 1) then
+							if setint ~= 0xFFFFFFFF then
+								if not writeInt(bt, setint) then return false end
+							end
 						elseif clearint ~= 0xFFFFFFFF then
-							if not writeInt(dest + j*2, clearint) then return false end
+							if not writeInt(bt, clearint) then return false end
 						end
+
+						bt = bt + 2
 					end
 				end
 
@@ -73,8 +86,8 @@ function dmacon.new(vm, c, branch, intn, memsize)
 				dest = dest + dinc
 			end
 
-			dest = dest + destmod
-			source = source + srcmod
+			dest = odest + destmod
+			source = osrc + srcmod
 		end
 
 		return true
@@ -92,6 +105,7 @@ function dmacon.new(vm, c, branch, intn, memsize)
 
 		for line = 0, lines - 1 do
 			local odest = dest
+			local osrc = source
 
 			for i = 0, count - 1 do
 				local b = readByte(source)
@@ -104,8 +118,8 @@ function dmacon.new(vm, c, branch, intn, memsize)
 				dest = dest + dinc
 			end
 
-			dest = dest + destmod
-			source = source + srcmod
+			dest = odest + destmod
+			source = osrc + srcmod
 		end
 
 		return true
@@ -123,6 +137,7 @@ function dmacon.new(vm, c, branch, intn, memsize)
 
 		for line = 0, lines - 1 do
 			local odest = dest
+			local osrc = source
 
 			for i = 0, count - 1 do
 				local b = readInt(source)
@@ -135,8 +150,8 @@ function dmacon.new(vm, c, branch, intn, memsize)
 				dest = dest + dinc
 			end
 
-			dest = dest + destmod
-			source = source + srcmod
+			dest = odest + destmod
+			source = osrc + srcmod
 		end
 
 		return true
@@ -154,6 +169,7 @@ function dmacon.new(vm, c, branch, intn, memsize)
 
 		for line = 0, lines - 1 do
 			local odest = dest
+			local osrc = source
 
 			for i = 0, count - 1 do
 				local b = readLong(source)
@@ -166,8 +182,8 @@ function dmacon.new(vm, c, branch, intn, memsize)
 				dest = dest + dinc
 			end
 
-			dest = dest + destmod
-			source = source + srcmod
+			dest = odest + destmod
+			source = osrc + srcmod
 		end
 
 		return true
