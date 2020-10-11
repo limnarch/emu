@@ -78,7 +78,7 @@ layout.m["kp9"] = 35
 function keydev.new(vm, c)
 	local kbd = {}
 
-	kbd.mid = 0x8FC48FC5
+	kbd.mid = 0x8FC48FC4
 
 	local cint = c.int
 
