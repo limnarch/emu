@@ -37,7 +37,10 @@ function pboard.new(vm, c, branch, intn)
 	local citron = pb.citron
 	local citronh = citron.bush
 
-	pb.serial = require("limn/ebus/platformboard/serial").new(vm, c, citron)
+	local serial = require("limn/ebus/platformboard/serial")
+	pb.serialA = serial.new(vm, c, citron)
+	pb.serialB = serial.new(vm, c, citron)
+	
 	pb.clock = require("limn/ebus/platformboard/clock").new(vm, c, citron)
 	pb.amtsu = require("limn/ebus/platformboard/amanatsu/bus").new(vm, c, citron)
 	pb.satsuma = require("limn/ebus/platformboard/satsuma").new(vm, c, citron)
@@ -99,7 +102,8 @@ function pboard.new(vm, c, branch, intn)
 
 	function pb.reset()
 		pb.clock.reset()
-		pb.serial.reset()
+		pb.serialA.reset()
+		pb.serialB.reset()
 		satsuma.reset()
 		amtsu.reset()
 		lsic.reset()

@@ -5,7 +5,7 @@ local ahdb = {}
 
 -- block size is 4096 bytes
 
--- interrupt 0x20 is raised when new information is available
+-- interrupt 0x2 is raised when new information is available
 
 -- port 0x19: commands
 --	0: idle

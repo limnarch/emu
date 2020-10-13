@@ -83,17 +83,17 @@ function cpu.new(vm, c)
 			error("double exception, shouldnt ever happen")
 		end
 
-		--if (n ~= 5) and (n ~= 1) then -- fault, do some debug info
+		--if (n ~= 5) and (n ~= 1) and (n ~= 3) and (n ~= 2) then -- fault, do some debug info
 		--	p.lastfaultaddr = r[31]
 
 		--	p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
+
+		--	running = false
 		--end
 
 		--p.dumpcalls(20)
 
 		currentexception = n
-
-		--running = false
 
 		--print(string.format("%x", fL(r[31]-4)))
 	end

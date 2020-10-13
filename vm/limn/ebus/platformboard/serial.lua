@@ -1,5 +1,7 @@
 local serial = {}
 
+termemu = require("ui/termemu")
+
 -- implements a serial port
 -- port 0x10: commands
 --	0: idle
@@ -18,6 +20,8 @@ end
 
 ]]
 
+local ports = 0
+
 function serial.new(vm, c, bus)
 	local s = {}
 
@@ -29,6 +33,16 @@ function serial.new(vm, c, bus)
 
 	local int = c.int
 
+	s.num = ports
+
+	local intnum
+
+	if s.num == 0 then
+		intnum = 0x3
+	elseif s.num == 1 then
+		intnum = 0x18
+	end
+
 	local iq = {}
 	local oq = {}
 
@@ -36,11 +50,13 @@ function serial.new(vm, c, bus)
 		iq[#iq + 1] = c
 
 		if doint then
-			int(0x3)
+			int(intnum)
 		end
 	end
 
-	bus.addPort(0x10, function (e,t,v)
+	local citronoffset = s.num*2
+
+	bus.addPort(0x10+citronoffset, function (e,t,v)
 		if t == 1 then
 			if v == 1 then
 				if s.termemu then
@@ -70,7 +86,7 @@ function serial.new(vm, c, bus)
 		return true
 	end)
 
-	bus.addPort(0x11, function (s,t,v)
+	bus.addPort(0x11+citronoffset, function (s,t,v)
 		if t == 1 then
 			port11 = v
 		else
@@ -108,7 +124,7 @@ function serial.new(vm, c, bus)
 		oq = {}
 	end
 
-	vm.registerOpt("-insf", function (arg, i)
+	vm.registerOpt("-insf"..tostring(s.num), function (arg, i)
 		s.stream(io.open(arg[i+1]):read("*a"))
 
 		return 2
@@ -116,35 +132,37 @@ function serial.new(vm, c, bus)
 	vm.registerOpt("-serial,stdio", function (arg, i)
 		stdo = true
 
-		love.thread.newThread(tc):start()
+		if s.num == 0 then
+			love.thread.newThread(tc):start()
 
-		vm.registerCallback("update", function (dt)
-			local x = love.thread.getChannel("serialin"):pop()
-			while x do
-				s.stream(x)
+			vm.registerCallback("update", function (dt)
+				local x = love.thread.getChannel("serialin"):pop()
+				while x do
+					s.stream(x)
 
-				x = love.thread.getChannel("serialin"):pop()
-			end
-		end)
+					x = love.thread.getChannel("serialin"):pop()
+				end
+			end)
+		end
 
 		return 1
 	end)
+
+	ports = ports + 1
 
 	if not window then
 		return s
 	end
 
-	s.termemu = require("ui/termemu")
+	s.termemu = termemu.new(s.stream, s.num)
 
-	s.termemu.stream = s.stream
+	if s.num == 0 then
+		vm.registerOpt("-serial,wopen", function (arg, i)
+			s.termemu.swindow:open()
 
-	s.termemu.swindow.name = "Serial Terminal"
-
-	vm.registerOpt("-serial,wopen", function (arg, i)
-		s.termemu.swindow:open()
-
-		return 1
-	end)
+			return 1
+		end)
+	end
 
 	return s
 end
