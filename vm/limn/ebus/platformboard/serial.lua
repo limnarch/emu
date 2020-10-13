@@ -129,10 +129,11 @@ function serial.new(vm, c, bus)
 
 		return 2
 	end)
-	vm.registerOpt("-serial,stdio", function (arg, i)
-		stdo = true
 
-		if s.num == 0 then
+	if s.num == 0 then
+		vm.registerOpt("-serial,stdio", function (arg, i)
+			stdo = true
+
 			love.thread.newThread(tc):start()
 
 			vm.registerCallback("update", function (dt)
@@ -143,10 +144,10 @@ function serial.new(vm, c, bus)
 					x = love.thread.getChannel("serialin"):pop()
 				end
 			end)
-		end
 
-		return 1
-	end)
+			return 1
+		end)
+	end
 
 	ports = ports + 1
 
