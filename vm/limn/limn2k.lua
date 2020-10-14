@@ -78,15 +78,23 @@ function cpu.new(vm, c)
 
 	local currentexception = nil
 
+	local function gsymstr(sym,off)
+		if not sym then return "" end
+
+		return string.format(" %s\n <%s+0x%X>", sym.file, sym.name, off)
+	end
+
 	function p.exception(n)
 		if currentexception then
 			error("double exception, shouldnt ever happen")
 		end
 
-		--if (n ~= 5) and (n ~= 1) and (n ~= 3) and (n ~= 2) then -- fault, do some debug info
+		--if (n ~= 5) and (n ~= 1) and (n ~= 3) and (n ~= 2) and (n ~= 6) then -- fault, do some debug info
 		--	p.lastfaultaddr = r[31]
 
 		--	p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
+
+		--	print(gsymstr(p.lastfaultsym, p.lastfaultoff))
 
 		--	running = false
 		--end
@@ -100,27 +108,27 @@ function cpu.new(vm, c)
 	local exception = p.exception
 
 	function p.tlbrefill(ptr)
-		exception(3)
 		r[43] = ptr
+		exception(3)
 		r[32] = lshift(rshift(ptr,22),2)
 		r[33] = lshift(band(rshift(ptr,12),1023),2)
 	end
 	local tlbrefill = p.tlbrefill
 
 	function p.pagefault(ptr)
-		exception(12)
 		r[43] = ptr
+		exception(12)
 	end
 	local pagefault = p.pagefault
 
 	function p.buserror(ptr)
-		exception(4)
 		r[43] = ptr
+		exception(4)
 	end
 
 	function p.unaligned(ptr)
-		exception(9)
 		r[43] = ptr
+		exception(9)
 	end
 
 	function p.fillState(s)
@@ -1808,12 +1816,6 @@ function cpu.new(vm, c)
 	end
 
 	local cycles = 0
-
-	local function gsymstr(sym,off)
-		if not sym then return "" end
-
-		return string.format(" %s\n <%s+0x%X>", sym.file, sym.name, off)
-	end
 
 	local once = true
 
