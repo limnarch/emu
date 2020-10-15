@@ -202,7 +202,7 @@ function cpu.new(vm, c)
 			end
 		end
 
-		local ppnt = lshift(rshift(tlbe, 4), 12)
+		local ppnt = lshift(band(rshift(tlbe, 4), 0xFFFFF), 12)
 
 		if ifetch then
 			Ilastvpn = vpn
