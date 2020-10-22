@@ -1863,7 +1863,7 @@ function cpu.new(vm, c)
 			if currentexception or (intmode and intc.interrupting) then
 				local ev
 
-				if currentexception == 3 then
+				if currentexception == 3 then -- TLB refill
 					ev = r[44]
 					r[31] = r[31] - 4
 				else
