@@ -410,7 +410,11 @@ function loff.new(filename)
 							if address >= (sym.value + s.linkedAddress) then
 								thesym = sym
 							elseif address < (sym.value + s.linkedAddress) then
-								return thesym, address - (thesym.value + s.linkedAddress)
+								if thesym then
+									return thesym, address - (thesym.value + s.linkedAddress)
+								else
+									return
+								end
 							end
 						end
 					end
