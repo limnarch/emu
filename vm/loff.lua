@@ -45,7 +45,7 @@ local fixup_s = struct({
 	{4, "symbolIndex"},
 	{4, "offset"},
 	{4, "size"},
-	{4, "divisor"},
+	{4, "shift"},
 })
 
 local uint32_s = struct {
@@ -91,6 +91,11 @@ function loff.new(filename)
 		s.linkedAddress = 0
 	end
 
+	local AIXOMAGIC = 0x4C455830
+	local LOFF1MAGIC = 0x4C4F4646
+	local LOFF2MAGIC = 0x4C4F4632
+	local LOFF3MAGIC = 0x4C4F4633
+
 	function iloff:load()
 		local file = io.open(self.path, "rb")
 
@@ -113,13 +118,13 @@ function loff.new(filename)
 
 		local magic = hdr.gv("magic")
 
-		if magic == 0x4C4F4646 then
+		if (magic == LOFF1MAGIC) or (magic == LOFF2MAGIC) then
 			print(string.format("objtool: '%s' is in an older LOFF format and needs to be rebuilt", self.path))
 			return false
-		elseif magic == 0x4C455830 then
+		elseif (magic == AIXOMAGIC) then
 			print(string.format("objtool: '%s' is in legacy AIXO format and needs to be rebuilt", self.path))
 			return false
-		elseif magic == 0x4C4F4632 then
+		elseif (magic == LOFF3MAGIC) then
 			-- goood
 		else
 			print(string.format("objtool: '%s' isn't a LOFF format", self.path))
@@ -254,7 +259,7 @@ function loff.new(filename)
 
 						f.size = fent.gv("size")
 
-						f.divisor = fent.gv("divisor")
+						f.shift = fent.gv("shift")
 
 						f.file = self.path
 					end
@@ -290,14 +295,14 @@ function loff.new(filename)
 
 							if sym.symtype == 4 then
 								if sym.value == 1 then
-									addrs.sv("value", math.floor(s.linkedAddress / v.divisor))
+									addrs.sv("value", rshift(s.linkedAddress, v.shift))
 								elseif sym.value == 2 then
-									addrs.sv("value", math.floor(s.size / v.divisor))
+									addrs.sv("value", rshift(s.size, v.shift))
 								elseif sym.value == 3 then
-									addrs.sv("value", math.floor((s.linkedAddress + s.size) / v.divisor))
+									addrs.sv("value", rshift(s.linkedAddress + s.size, v.shift))
 								end
 							else
-								addrs.sv("value", math.floor((sym.value + s.linkedAddress) / v.divisor))
+								addrs.sv("value", rshift(sym.value + s.linkedAddress, v.shift))
 							end
 						end
 					end
@@ -406,7 +411,7 @@ function loff.new(filename)
 					local thesym
 
 					for k,sym in ipairs(self.isym) do
-						if (sym.section == i) and (sym.symtype == 1) then
+						if (sym.section == i) and (sym.symtype ~= 4) then
 							if address >= (sym.value + s.linkedAddress) then
 								thesym = sym
 							elseif address < (sym.value + s.linkedAddress) then
@@ -504,7 +509,7 @@ function loff.new(filename)
 			es.index = addSymbol(es.name, es.section, es.symtype, es.value)
 		end
 
-		local function addFixup(section, symindex, offset, size, divisor)
+		local function addFixup(section, symindex, offset, size, shift)
 			local u1, u2, u3, u4 = splitInt32(symindex)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
@@ -514,7 +519,7 @@ function loff.new(filename)
 			u1, u2, u3, u4 = splitInt32(size)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-			u1, u2, u3, u4 = splitInt32(divisor)
+			u1, u2, u3, u4 = splitInt32(shift)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		end
 
@@ -533,7 +538,7 @@ function loff.new(filename)
 						sindex = v.symbol.index
 					end
 
-					addFixup(s, sindex, v.offset, v.size, v.divisor)
+					addFixup(s, sindex, v.offset, v.size, v.shift)
 
 					s.fixupcount = s.fixupcount + 1
 				end
@@ -548,7 +553,7 @@ function loff.new(filename)
 		-- make header
 		local size = 72
 
-		local header = "2FOL"
+		local header = "3FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)
@@ -736,7 +741,7 @@ function loff.new(filename)
 					if v.size <= 8 then
 						local type_s = struct({{v.size, "value"}})
 						local addrs = cast(type_s, mysection.contents, v.offset)
-						addrs.sv("value", (sym.resolved.value / v.divisor))
+						addrs.sv("value", rshift(sym.resolved.value, v.shift))
 					else
 						--print("didnt resolve")
 					end
