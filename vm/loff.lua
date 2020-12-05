@@ -127,13 +127,15 @@ function loff.new(filename)
 		elseif (magic == LOFF3MAGIC) then
 			-- goood
 		else
-			print(string.format("objtool: '%s' isn't a LOFF format", self.path))
+			print(string.format("objtool: '%s' isn't a LOFF format image", self.path))
 			return false
 		end
 
 		self.codeType = self.header.gv("targetArchitecture")
 
 		self.archinfo = archinfo[self.codeType]
+
+		self.localSymNames = false
 
 		local stripped = self.header.gv("stripped")
 
@@ -180,7 +182,13 @@ function loff.new(filename)
 				return false
 			end
 
-			local name = getString(sym.gv("nameOffset"))
+			local noff = sym.gv("nameOffset")
+
+			local name
+
+			if noff ~= 0xFFFFFFFF then
+				name = getString(sym.gv("nameOffset"))
+			end
 
 			symt.name = name
 
@@ -192,14 +200,16 @@ function loff.new(filename)
 
 			self.isym[#self.isym + 1] = symt
 
-			if symt.symtype == 1 then
-				self.globals[name] = symt
-			elseif symt.symtype == 2 then
-				self.locals[name] = symt
-			elseif symt.symtype == 3 then
-				self.externs[name] = symt
-			elseif symt.symtype == 4 then
-				self.specials[name] = symt
+			if name then
+				if symt.symtype == 1 then
+					self.globals[name] = symt
+				elseif symt.symtype == 2 then
+					self.locals[name] = symt
+				elseif symt.symtype == 3 then
+					self.externs[name] = symt
+				elseif symt.symtype == 4 then
+					self.specials[name] = symt
+				end
 			end
 
 			ptr = ptr + symbol_s.size()
@@ -461,7 +471,13 @@ function loff.new(filename)
 		local function addSymbol(name, section, symtype, value)
 			local off = symtabindex
 
-			local nameoff = addString(name)
+			local nameoff = 0xFFFFFFFF
+
+			if name then
+				if (symtype ~= 2) or self.localSymNames then
+					nameoff = addString(name)
+				end
+			end
 
 			local u1, u2, u3, u4 = splitInt32(nameoff)
 			symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)

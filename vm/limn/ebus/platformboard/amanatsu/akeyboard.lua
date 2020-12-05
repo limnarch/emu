@@ -112,6 +112,7 @@ function keydev.new(vm, c)
 					return true
 				end
 			end
+			--[[
 			for k,v in pairs(layout.m) do -- this is necessary because sometimes love2d misses keystrokes and we must compensate. why!!
 				if #k > 0 then
 					local down = love.keyboard.isDown(k)
@@ -127,6 +128,7 @@ function keydev.new(vm, c)
 					end
 				end
 			end
+			]]
 			kbd.portA = 0xFFFF
 		elseif v == 2 then -- reset
 			outstandingp = {}
