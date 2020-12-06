@@ -20,10 +20,17 @@ local loffheader_s = struct({
 	{4, "targetArchitecture"},
 	{4, "entrySymbol"},
 	{4, "stripped"},
-	{28, "reserved"},
+	{4, "importTableOffset"},
+	{4, "importCount"},
+	{20, "reserved"},
 	{4, "textHeaderOffset"},
 	{4, "dataHeaderOffset"},
 	{4, "bssHeaderOffset"},
+})
+
+local import_s = struct({
+	{4, "name"},
+	{16, "reserved"},
 })
 
 local sectionheader_s = struct({
@@ -39,6 +46,7 @@ local symbol_s = struct({
 	{4, "section"},
 	{4, "type"},
 	{4, "value"},
+	{4, "importIndex"}
 })
 
 local fixup_s = struct({
@@ -73,6 +81,8 @@ function loff.new(filename)
 
 	iloff.specials = {}
 
+	iloff.imports = {}
+
 	for i = 1, 3 do
 		iloff.sections[i] = {}
 		local s = iloff.sections[i]
@@ -95,6 +105,7 @@ function loff.new(filename)
 	local LOFF1MAGIC = 0x4C4F4646
 	local LOFF2MAGIC = 0x4C4F4632
 	local LOFF3MAGIC = 0x4C4F4633
+	local LOFF4MAGIC = 0x4C4F4634
 
 	function iloff:load()
 		local file = io.open(self.path, "rb")
@@ -118,13 +129,13 @@ function loff.new(filename)
 
 		local magic = hdr.gv("magic")
 
-		if (magic == LOFF1MAGIC) or (magic == LOFF2MAGIC) then
+		if (magic == LOFF1MAGIC) or (magic == LOFF2MAGIC) or (magic == LOFF3MAGIC) then
 			print(string.format("objtool: '%s' is in an older LOFF format and needs to be rebuilt", self.path))
 			return false
 		elseif (magic == AIXOMAGIC) then
 			print(string.format("objtool: '%s' is in legacy AIXO format and needs to be rebuilt", self.path))
 			return false
-		elseif (magic == LOFF3MAGIC) then
+		elseif (magic == LOFF4MAGIC) then
 			-- goood
 		else
 			print(string.format("objtool: '%s' isn't a LOFF format image", self.path))
@@ -161,6 +172,19 @@ function loff.new(filename)
 
 		local ptr
 
+		local impcount = hdr.gv("importCount")
+		ptr = hdr.gv("importTableOffset")
+
+		for i = 1, impcount do
+			local imp = cast(import_s, self.bin, ptr)
+
+			local import = {}
+
+			import.name = imp.gs("name")
+
+			self.imports[i-1] = import
+		end
+
 		local symcount = hdr.gv("symbolCount")
 		ptr = hdr.gv("symbolTableOffset")
 
@@ -181,6 +205,8 @@ function loff.new(filename)
 				print(string.format("objtool: '%s': section # > 3", self.path))
 				return false
 			end
+
+			symt.importindex = sym.gv("importIndex")
 
 			local noff = sym.gv("nameOffset")
 
@@ -209,6 +235,17 @@ function loff.new(filename)
 					self.externs[name] = symt
 				elseif symt.symtype == 4 then
 					self.specials[name] = symt
+				end
+			end
+
+			if symt.symtype == 3 then
+				if symt.importindex ~= 0 then
+					symt.import = self.imports[symt.importindex-1]
+
+					if not symt.import then
+						print(string.format("objtool: '%s': non-existent import %d", self.path, symt.importindex))
+						return false
+					end
 				end
 			end
 
@@ -468,7 +505,7 @@ function loff.new(filename)
 		local symtab = ""
 		local symtabindex = 0
 
-		local function addSymbol(name, section, symtype, value)
+		local function addSymbol(name, section, symtype, value, import)
 			local off = symtabindex
 
 			local nameoff = 0xFFFFFFFF
@@ -491,6 +528,9 @@ function loff.new(filename)
 			u1, u2, u3, u4 = splitInt32(value)
 			symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
+			u1, u2, u3, u4 = splitInt32(import or 0)
+			symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
 			symtabindex = symtabindex + 1
 
 			return off
@@ -505,13 +545,13 @@ function loff.new(filename)
 				if sym and (not sym.resolved) then
 					if sym.symtype == 4 then
 						if not sp[sym.name] then
-							sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+							sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value, sym.importindex)
 							sp[sym.name] = sym.index
 						else
 							sym.index = sp[sym.name]
 						end
 					else
-						sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+						sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value, sym.importindex)
 					end
 				end
 			end
@@ -523,6 +563,30 @@ function loff.new(filename)
 			end
 
 			es.index = addSymbol(es.name, es.section, es.symtype, es.value)
+		end
+
+		local imptab = ""
+		local imptabindex = 0
+
+		local function addImport(name)
+			local nameoff = addString(name)
+
+			local u1, u2, u3, u4 = splitInt32(nameoff)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			for i = 0, 15 do -- reserved
+				imptab = imptab .. string.char(0)
+			end
+
+			imptabindex = imptabindex + 1
+		end
+
+		for i = 0, #self.imports do
+			local imp = self.imports[i]
+
+			if imp then
+				addImport(imp.name)
+			end
 		end
 
 		local function addFixup(section, symindex, offset, size, shift)
@@ -569,7 +633,7 @@ function loff.new(filename)
 		-- make header
 		local size = 72
 
-		local header = "3FOL"
+		local header = "4FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)
@@ -616,8 +680,17 @@ function loff.new(filename)
 		u1, u2, u3, u4 = splitInt32(stripped)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
+		-- importTableOffset
+		local u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + (imptabindex * import_s.size())
+
+		-- importCount
+		u1, u2, u3, u4 = splitInt32(imptabindex)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
 		-- reserved
-		for i = 0, 27 do
+		for i = 0, 19 do
 			header = header .. string.char(0)
 		end
 
@@ -707,7 +780,7 @@ function loff.new(filename)
 		u1, u2, u3, u4 = splitInt32(bs.linkedAddress)
 		bssHeader = bssHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-		file:write(header .. symtab .. strtab .. textHeader .. dataHeader .. bssHeader)
+		file:write(header .. symtab .. strtab .. imptab .. textHeader .. dataHeader .. bssHeader)
 
 		for i = 1, 2 do
 			local s = self.sections[i]
