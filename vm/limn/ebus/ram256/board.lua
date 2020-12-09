@@ -8,7 +8,7 @@ function ram256.new(vm, c, branch, intn, memsize)
 	ram.memsize = memsize
 	local memsize = ram.memsize
 
-	ram.physmem = ffi.new("uint8_t[?]", memsize)
+	ram.physmem = ffi.new("uint32_t[?]", memsize/4)
 	local physmem = ram.physmem
 
 	--for i = 0, memsize-1 do
@@ -23,34 +23,56 @@ function ram256.new(vm, c, branch, intn, memsize)
 		end
 
 		if s == 0 then -- byte
+			local off = band(offset, 0x3)
+
 			if t == 0 then
-				return physmem[offset]
+				if off == 0 then
+					return band(physmem[rshift(offset, 2)], 0x000000FF)
+				elseif off == 1 then
+					return band(rshift(physmem[rshift(offset, 2)], 8), 0x0000FF)
+				elseif off == 2 then
+					return band(rshift(physmem[rshift(offset, 2)], 16), 0x00FF)
+				elseif off == 3 then
+					return band(rshift(physmem[rshift(offset, 2)], 24), 0xFF)
+				end
 			else
-				physmem[offset] = band(v,0xFF)
+				local cw = rshift(offset, 2)
+				local word = physmem[cw]
+
+				local off = band(offset, 0x3)
+
+				if off == 0 then
+					physmem[cw] = band(word, 0xFFFFFF00) + band(v, 0xFF)
+				elseif off == 1 then 
+					physmem[cw] = band(word, 0xFFFF00FF) + lshift(band(v, 0xFF), 8)
+				elseif off == 2 then
+					physmem[cw] = band(word, 0xFF00FFFF) + lshift(band(v, 0xFF), 16)
+				elseif off == 3 then
+					physmem[cw] = band(word, 0x00FFFFFF) + lshift(band(v, 0xFF), 24)
+				end
 			end
 		elseif s == 1 then -- int
 			if t == 0 then
-				local u1, u2 = physmem[offset], physmem[offset + 1]
-
-				return (u2 * 0x100) + u1
+				if band(offset, 0x3) == 0 then
+					return band(physmem[rshift(offset, 2)], 0xFFFF)
+				else
+					return rshift(physmem[rshift(offset, 2)], 16)
+				end
 			else
-				local u1, u2 = (math.modf(v/256))%256, v%256
+				local cw = rshift(offset, 2)
+				local word = physmem[cw]
 
-				physmem[offset] = u2
-				physmem[offset+1] = u1 -- little endian
+				if band(offset, 0x3) == 0 then
+					physmem[cw] = band(word, 0xFFFF0000) + band(v, 0xFFFF)
+				else
+					physmem[cw] = band(word, 0x0000FFFF) + lshift(v, 16)
+				end
 			end
 		elseif s == 2 then -- long
 			if t == 0 then
-				local u1, u2, u3, u4 = physmem[offset], physmem[offset + 1], physmem[offset + 2], physmem[offset + 3]
-
-				return (u4 * 0x1000000) + (u3 * 0x10000) + (u2 * 0x100) + u1
+				return physmem[rshift(offset, 2)]
 			else
-				local u1, u2, u3, u4 = (math.modf(v/16777216))%256, (math.modf(v/65536))%256, (math.modf(v/256))%256, v%256
-
-				physmem[offset] = u4
-				physmem[offset+1] = u3
-				physmem[offset+2] = u2
-				physmem[offset+3] = u1 -- little endian
+				physmem[rshift(offset, 2)] = v
 			end
 		end
 

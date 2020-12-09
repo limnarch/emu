@@ -26,8 +26,20 @@ function block.new(image, blocksize)
 		return string.byte(self.file:read(1) or "\0")
 	end
 
+	function bd:readLong()
+		local l = self.file:read(4)
+
+		return lshift(string.byte(l:sub(4,4)), 24) + lshift(string.byte(l:sub(3,3)), 16) + lshift(string.byte(l:sub(2,2)), 8) + string.byte(l:sub(1,1))
+	end
+
 	function bd:write(byte)
 		self.file:write(string.char(byte or 0))
+	end
+
+	function bd:writeLong(long)
+		local l = string.char(band(long, 0xFF)) .. string.char(band(rshift(long, 8), 0xFF)) .. string.char(band(rshift(long, 16), 0xFF)) .. string.char(rshift(long, 24))
+
+		self.file:write(l)
 	end
 
 	function bd:readBlock(block)

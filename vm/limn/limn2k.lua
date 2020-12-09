@@ -251,6 +251,11 @@ function cpu.new(vm, c)
 			return false
 		end
 
+		if band(ptr, 0x1) ~= 0 then
+			unaligned(ptr)
+			return false
+		end
+
 		if not translating then return TfI(ptr, v) end
 
 		local v = translate(ptr, 2)
@@ -264,6 +269,11 @@ function cpu.new(vm, c)
 	function p.fetchLong(ptr)
 		if (ptr < 1024) or (ptr >= 0xFFFFFC00) then
 			pagefault(ptr)
+			return false
+		end
+
+		if band(ptr, 0x3) ~= 0 then
+			unaligned(ptr)
 			return false
 		end
 
@@ -299,6 +309,11 @@ function cpu.new(vm, c)
 			return false
 		end
 
+		if band(ptr, 0x1) ~= 0 then
+			unaligned(ptr)
+			return false
+		end
+
 		if not translating then return TsI(ptr, v) end
 
 		local ta = translate(ptr, 2, true)
@@ -312,6 +327,11 @@ function cpu.new(vm, c)
 	function p.storeLong(ptr, v)
 		if (ptr < 1024) or (ptr >= 0xFFFFFC00) then
 			pagefault(ptr)
+			return false
+		end
+
+		if band(ptr, 0x3) ~= 0 then
+			unaligned(ptr)
 			return false
 		end
 		

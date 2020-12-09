@@ -5,8 +5,8 @@ local dmacon = {}
 function dmacon.new(vm, c, branch, intn, memsize)
 	local dma = {}
 
-	if branch ~= 7 then
-		error("virtual DMA board only wants to be in ebus branch 7")
+	if branch ~= 30 then
+		error("virtual DMA board only wants to be in ebus branch 30")
 	end
 
 	local log = vm.log.log

@@ -29,9 +29,9 @@ function gpu.new(vm, c, page, intn)
 
 	local vramsize = 0x400000
 
-	local vram = ffi.new("uint8_t[?]", vramsize)
+	local vram = ffi.new("uint16_t[?]", vramsize)
 
-	local curbmp = ffi.new("uint8_t[2048]")
+	local curbmp = ffi.new("uint16_t[1024]")
 
 	local displaylist = ffi.new("uint32_t[64]")
 
@@ -112,40 +112,40 @@ function gpu.new(vm, c, page, intn)
 		cint(intn)
 	end
 
-	local function bwaccess(tab, s, t, offset, v) -- byte wise access of table
+	local function bwaccess(tab, s, t, offset, v) -- byte wise access of 16 bit table
 		if s == 0 then -- byte
 			if t == 0 then
-				return tab[offset]
+				if band(offset, 0x1) == 0 then
+					return band(tab[rshift(offset, 1)], 0xFF)
+				else
+					return rshift(tab[rshift(offset, 1)], 8)
+				end
 			else
-				tab[offset] = v
+				local cw = rshift(offset, 1)
+				local word = tab[cw]
+
+				if band(offset, 0x1) == 0 then
+					tab[cw] = band(word, 0xFF00) + band(v, 0xFF)
+				else
+					tab[cw] = band(word, 0x00FF) + lshift(v, 8)
+				end
 			end
 		elseif s == 1 then -- int
 			if t == 0 then
-				local u1, u2 = tab[offset], tab[offset + 1]
-
-				return (u2 * 0x100) + u1
+				return tab[rshift(offset, 1)]
 			else
-				local e1 = band(v, 0xFF)
-				local e2 = rshift(band(v, 0xFF00), 8)
-
-				tab[offset] = e1
-				tab[offset + 1] = e2
+				tab[rshift(offset, 1)] = v
 			end
 		elseif s == 2 then -- long
 			if t == 0 then
-				local u1, u2, u3, u4 = tab[offset], tab[offset + 1], tab[offset + 2], tab[offset + 3]
+				local o = rshift(offset, 1)
 
-				return (u4 * 0x1000000) + (u3 * 0x10000) + (u2 * 0x100) + u1
+				return lshift(tab[o + 1], 16) + tab[o]
 			else
-				local e1 = band(v, 0xFF)
-				local e2 = rshift(band(v, 0xFF00), 8)
-				local e3 = rshift(band(v, 0xFF0000), 16)
-				local e4 = rshift(band(v, 0xFF000000), 24)
+				local o = rshift(offset, 1)
 
-				tab[offset] = e1
-				tab[offset + 1] = e2
-				tab[offset + 2] = e3
-				tab[offset + 3] = e4
+				tab[o] = band(v, 0xFFFF)
+				tab[o + 1] = rshift(v, 16)
 			end
 		end
 
@@ -212,14 +212,12 @@ function gpu.new(vm, c, page, intn)
 	end
 
 	local function dirtyLine(addr, w)
-		if (addr >= fbsize) then
+		if (addr*2 >= fbsize) then
 			return
 		end
 
-		local pix = floor(addr/2)
-
-		local x = pix % width
-		local y = floor(pix / width)
+		local x = addr % width
+		local y = floor(addr / width)
 
 		makeDirty(x, y, x+w, y)
 	end
@@ -315,14 +313,9 @@ function gpu.new(vm, c, page, intn)
 					return
 				end
 
-				local dc = bor(lshift(vram[rfAddr1 + 1], 8), vram[rfAddr1])
+				vram[rfAddr1] = operate(vram[rfAddr1], rfColor, rfMode)
 
-				local c = operate(dc, rfColor, rfMode)
-
-				vram[rfAddr1] = band(c, 0xFF)
-				vram[rfAddr1 + 1] = rshift(c, 8)
-
-				rfAddr1 = rfAddr1 + 2
+				rfAddr1 = rfAddr1 + 1
 				rfLastCount = rfLastCount + 1
 				pixels = pixels + 1
 			end
@@ -349,18 +342,15 @@ function gpu.new(vm, c, page, intn)
 					return
 				end
 
-				local sc = bor(lshift(vram[rfAddr2 + 1], 8), vram[rfAddr2])
-				local dc = bor(lshift(vram[rfAddr1 + 1], 8), vram[rfAddr1])
+				local sc = vram[rfAddr2]
+				local dc = vram[rfAddr1]
 
 				if band(sc, 0x8000) == 0 then
-					local c = operate(band(dc, 0x7FFF), band(sc, 0x7FFF), rfMode)
-
-					vram[rfAddr1] = band(c, 0xFF)
-					vram[rfAddr1 + 1] = rshift(c, 8)
+					vram[rfAddr1] = operate(band(dc, 0x7FFF), band(sc, 0x7FFF), rfMode)
 				end
 
-				rfAddr1 = rfAddr1 + 2
-				rfAddr2 = rfAddr2 + 2
+				rfAddr1 = rfAddr1 + 1
+				rfAddr2 = rfAddr2 + 1
 				rfLastCount = rfLastCount + 1
 				pixels = pixels + 1
 			end
@@ -411,8 +401,8 @@ function gpu.new(vm, c, page, intn)
 			rfMode = band(inst, 0xF)
 			rfColor = band(rshift(inst, 4), 0x7FFF)
 
-			rfAddr1 = destTexAddr + (destRectY * destTexW * 2) + (destRectX * 2)
-			rfModulo1 = math.abs(destTexW - destRectW) * 2
+			rfAddr1 = destTexAddr + (destRectY * destTexW) + destRectX
+			rfModulo1 = math.abs(destTexW - destRectW)
 			rfCount = destRectW
 			rfLines = destRectH
 
@@ -424,11 +414,11 @@ function gpu.new(vm, c, page, intn)
 		[0x0A] = function (inst) -- BLITRECT
 			rfMode = band(inst, 0xF)
 
-			rfAddr1 = destTexAddr + (destRectY * destTexW * 2) + (destRectX * 2)
-			rfModulo1 = math.abs(destTexW - destRectW) * 2
+			rfAddr1 = destTexAddr + (destRectY * destTexW) + destRectX
+			rfModulo1 = math.abs(destTexW - destRectW) 
 
-			rfAddr2 = sourceTexAddr + (sourceRectY * sourceTexW * 2) + (sourceRectX * 2)
-			rfModulo2 = math.abs(sourceTexW - sourceRectW) * 2
+			rfAddr2 = sourceTexAddr + (sourceRectY * sourceTexW) + sourceRectX
+			rfModulo2 = math.abs(sourceTexW - sourceRectW)
 
 			rfCount = sourceRectW
 			rfLines = sourceRectH
@@ -482,14 +472,9 @@ function gpu.new(vm, c, page, intn)
 			local y = y1
 
 			for x = x1, x2 do
-				local addr = destTexAddr + (y * destTexW * 2) + (x * 2)
+				local addr = destTexAddr + (y * destTexW) + x
 
-				local dc = bor(lshift(vram[addr + 1], 8), vram[addr])
-
-				local c = operate(dc, color, mode)
-
-				vram[addr] = band(c, 0xFF)
-				vram[addr + 1] = rshift(c, 8)
+				vram[addr] = operate(vram[addr], color, mode)
 
 				if D > 0 then
 					y = y + yi
@@ -679,12 +664,12 @@ function gpu.new(vm, c, page, intn)
 
 				local imageData = love.image.newImageData(uw, uh)
 
-				local base = (dirtyWindowY * width * 2) + (dirtyWindowX * 2)
+				local base = (dirtyWindowY * width) + (dirtyWindowX)
 
 				imageData:mapPixel(function (x,y,r,g,b,a)
-					local pix = base + (y * width * 2) + (x * 2)
+					local pix = base + (y * width) + x
 
-					local e = palette[band(vram[pix+1] * 0x100 + vram[pix], 0x7FFF)]
+					local e = palette[band(vram[pix], 0x7FFF)]
 
 					return e.r/255,e.g/255,e.b/255,1
 				end, 0, 0, uw, uh)
@@ -744,9 +729,9 @@ function gpu.new(vm, c, page, intn)
 			local tid = love.image.newImageData(width, height)
 
 			tid:mapPixel(function (x,y,r,g,b,a)
-				local pix = (y * width * 2) + (x * 2)
+				local pix = y * width + x
 
-				local e = palette[band(vram[pix+1] * 0x100 + vram[pix], 0x7FFF)]
+				local e = palette[band(vram[pix], 0x7FFF)]
 
 				return e.r/255,e.g/255,e.b/255,1
 			end)

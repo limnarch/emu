@@ -79,11 +79,6 @@ function bus.new(vm, c, aligned)
 	end
 
 	function b.fetchInt(ptr)
-		if band(ptr, 1) ~= 0 then
-			c.cpu.unaligned(ptr)
-			return false
-		end
-
 		ptr = band(ptr, 0xFFFFFFFF)
 
 		local r = areah[rshift(ptr, 27)](1, 0, band(ptr, 0x7FFFFFF))
@@ -96,11 +91,6 @@ function bus.new(vm, c, aligned)
 	end
 
 	function b.fetchLong(ptr)
-		if band(ptr, 3) ~= 0 then
-			c.cpu.unaligned(ptr)
-			return false
-		end
-
 		ptr = band(ptr, 0xFFFFFFFF)
 
 		local r = areah[rshift(ptr, 27)](2, 0, band(ptr, 0x7FFFFFF))
@@ -128,11 +118,6 @@ function bus.new(vm, c, aligned)
 	end
 
 	function b.storeInt(ptr, v)
-		if band(ptr, 1) ~= 0 then
-			c.cpu.unaligned(ptr)
-			return false
-		end
-
 		ptr = band(ptr, 0xFFFFFFFF)
 
 		if not areah[rshift(ptr, 27)](1, 1, band(ptr, 0x7FFFFFF), v) then
@@ -144,11 +129,6 @@ function bus.new(vm, c, aligned)
 	end
 
 	function b.storeLong(ptr, v)
-		if band(ptr, 3) ~= 0 then
-			c.cpu.unaligned(ptr)
-			return false
-		end
-
 		ptr = band(ptr, 0xFFFFFFFF)
 
 		if not areah[rshift(ptr, 27)](2, 1, band(ptr, 0x7FFFFFF), v) then

@@ -52,7 +52,7 @@ function ahdb.new(vm, c, bus)
 
 	local int = c.int
 
-	b.buffer = ffi.new("uint8_t[4096]")
+	b.buffer = ffi.new("uint32_t[1024]")
 	local buffer = b.buffer
 
 	function b.handler(s, t, offset, v)
@@ -60,33 +60,57 @@ function ahdb.new(vm, c, bus)
 			return false
 		end
 
-		if t == 0 then
-			if s == 0 then
-				return buffer[offset]
-			elseif s == 1 then
-				local u1, u2 = buffer[offset], buffer[offset + 1]
+		if s == 0 then -- byte
+			local off = band(offset, 0x3)
 
-				return (u2 * 0x100) + u1
-			elseif s == 2 then
-				local u1, u2, u3, u4 = buffer[offset], buffer[offset + 1], buffer[offset + 2], buffer[offset + 3]
+			if t == 0 then
+				if off == 0 then
+					return band(buffer[rshift(offset, 2)], 0x000000FF)
+				elseif off == 1 then
+					return band(rshift(buffer[rshift(offset, 2)], 8), 0x0000FF)
+				elseif off == 2 then
+					return band(rshift(buffer[rshift(offset, 2)], 16), 0x00FF)
+				elseif off == 3 then
+					return band(rshift(buffer[rshift(offset, 2)], 24), 0xFF)
+				end
+			else
+				local cw = rshift(offset, 2)
+				local word = buffer[cw]
 
-				return (u4 * 0x1000000) + (u3 * 0x10000) + (u2 * 0x100) + u1
+				local off = band(offset, 0x3)
+
+				if off == 0 then
+					buffer[cw] = band(word, 0xFFFFFF00) + band(v, 0xFF)
+				elseif off == 1 then 
+					buffer[cw] = band(word, 0xFFFF00FF) + lshift(band(v, 0xFF), 8)
+				elseif off == 2 then
+					buffer[cw] = band(word, 0xFF00FFFF) + lshift(band(v, 0xFF), 16)
+				elseif off == 3 then
+					buffer[cw] = band(word, 0x00FFFFFF) + lshift(band(v, 0xFF), 24)
+				end
 			end
-		elseif t == 1 then
-			if s == 0 then
-				buffer[offset] = v
-			elseif s == 1 then
-				local u1, u2 = (math.modf(v/256))%256, v%256
+		elseif s == 1 then -- int
+			if t == 0 then
+				if band(ptr, 0x3) == 0 then
+					return band(buffer[rshift(offset, 2)], 0xFFFF)
+				else
+					return rshift(buffer[rshift(offset, 2)], 16)
+				end
+			else
+				local cw = rshift(offset, 2)
+				local word = buffer[cw]
 
-				buffer[offset] = u2
-				buffer[offset+1] = u1 -- little endian
-			elseif s == 2 then
-				local u1, u2, u3, u4 = (math.modf(v/16777216))%256, (math.modf(v/65536))%256, (math.modf(v/256))%256, v%256
-
-				buffer[offset] = u4
-				buffer[offset+1] = u3
-				buffer[offset+2] = u2
-				buffer[offset+3] = u1 -- little endian
+				if band(offset, 0x3) == 0 then
+					buffer[cw] = band(word, 0xFFFF0000) + band(v, 0xFFFF)
+				else
+					buffer[cw] = band(word, 0x0000FFFF) + lshift(v, 16)
+				end
+			end
+		elseif s == 2 then -- long
+			if t == 0 then
+				return buffer[rshift(offset, 2)]
+			else
+				buffer[rshift(offset, 2)] = v
 			end
 		end
 
@@ -192,8 +216,8 @@ function ahdb.new(vm, c, bus)
 					local db = d.block
 					db:seek(block)
 
-					for i = 0, 4095 do
-						buffer[i] = db:read()
+					for i = 0, 1023 do
+						buffer[i] = db:readLong()
 					end
 
 					b.info(0, block)
@@ -225,8 +249,8 @@ function ahdb.new(vm, c, bus)
 					local db = d.block
 					db:seek(block)
 
-					for i = 0, 4095 do
-						db:write(buffer[i])
+					for i = 0, 1023 do
+						db:writeLong(buffer[i])
 					end
 
 					b.info(0, block)

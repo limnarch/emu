@@ -3,30 +3,41 @@ local rom = {}
 function rom.new(vm, c)
 	local r = {}
 
-	r.rom = ffi.new("uint8_t[131072]")
+	r.rom = ffi.new("uint32_t[32768]")
 	local rom = r.rom
 
 	function r.romh(s, t, offset, v)
 		if s == 0 then -- byte
+			local off = band(offset, 0x3)
+
 			if t == 0 then
-				return rom[offset]
+				if off == 0 then
+					return band(rom[rshift(offset, 2)], 0x000000FF)
+				elseif off == 1 then
+					return band(rshift(rom[rshift(offset, 2)], 8), 0x0000FF)
+				elseif off == 2 then
+					return band(rshift(rom[rshift(offset, 2)], 16), 0x00FF)
+				elseif off == 3 then
+					return band(rshift(rom[rshift(offset, 2)], 24), 0xFF)
+				end
 			end
 		elseif s == 1 then -- int
 			if t == 0 then
-				local u1, u2 = rom[offset], rom[offset + 1]
-
-				return (u2 * 0x100) + u1
+				if band(offset, 0x3) == 0 then
+					return band(rom[rshift(offset, 2)], 0xFFFF)
+				else
+					return rshift(rom[rshift(offset, 2)], 16)
+				end
 			end
 		elseif s == 2 then -- long
 			if t == 0 then
-				local u1, u2, u3, u4 = rom[offset], rom[offset + 1], rom[offset + 2], rom[offset + 3]
-
-				return (u4 * 0x1000000) + (u3 * 0x10000) + (u2 * 0x100) + u1
+				return rom[rshift(offset, 2)]
 			end
 		end
 
 		return false
 	end
+	local romh = r.romh
 
 	vm.registerOpt("-rom", function (arg, i)
 		local rf = io.open(arg[i+1], "rb")
@@ -36,10 +47,16 @@ function rom.new(vm, c)
 		end
 
 		local e = rf:read("*all")
-		for j = 1, #e do
-			rom[j-1] = string.byte(e:sub(j,j))
+
+		local longs = rshift(#e, 2)
+
+		local longi = 0
+
+		for j = 1, longs do
+			rom[j-1] = lshift(string.byte(e:sub(longi+4,longi+4)), 24) + lshift(string.byte(e:sub(longi+3,longi+3)), 16) + lshift(string.byte(e:sub(longi+2,longi+2)), 8) + string.byte(e:sub(longi+1,longi+1))
+			longi = longi + 4
 		end
-		for i = #e, 131071 do
+		for i = longs, 32767 do
 			rom[i] = 0
 		end
 		rf:close()
