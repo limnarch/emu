@@ -650,9 +650,7 @@ function gpu.new(vm, c, page, intn)
 			end
 
 			if dirty then
-				if not init then
-					init = true
-				end
+				init = true
 
 				local uw, uh = dirtyWindowX1 - dirtyWindowX + 1, dirtyWindowY1 - dirtyWindowY + 1
 
