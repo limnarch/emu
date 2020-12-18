@@ -1,6 +1,6 @@
 local serial = {}
 
-termemu = require("ui/termemu")
+local termemu = require("ui/termemu")
 
 -- implements a serial port
 -- port 0x10: commands
@@ -13,9 +13,65 @@ termemu = require("ui/termemu")
 
 local tc = [[
 
+local sch = love.thread.getChannel("serialin")
+
 while true do
 	local c = (io.read() or "").."\n"
-	love.thread.getChannel("serialin"):push(c)
+	sch:push(c)
+end
+
+]]
+
+local tcpt = [[
+
+local sch = love.thread.getChannel("serialin")
+
+local soch = love.thread.getChannel("serialout")
+
+local port = sch:pop()
+
+local socket = require("socket")
+
+local server = assert(socket.bind("*", port))
+
+while true do
+	local client = server:accept()
+
+	client:settimeout(0.05)
+
+	while true do
+		local ok = true
+
+		local b, err = client:receive(1)
+
+		if err == "closed" then break end
+
+		if b == "\r" then
+			sch:push("\n")
+		else
+			sch:push(b)
+		end
+
+		local x = soch:pop()
+		while x do
+			if x == "\n" then
+				ok, err = client:send("\r\n")
+			else
+				ok, err = client:send(x)
+			end
+
+			if err == "closed" then
+				soch:push(x)
+				break
+			end
+
+			x = soch:pop()
+		end
+
+		if not ok then
+			break
+		end
+	end
 end
 
 ]]
@@ -26,6 +82,8 @@ function serial.new(vm, c, bus)
 	local s = {}
 
 	local stdo = false
+
+	local tcpo = false
 
 	local doint = false
 
@@ -66,6 +124,8 @@ function serial.new(vm, c, bus)
 				if stdo then
 					io.write(string.char(port11))
 					io.flush()
+				elseif tcpo then
+					love.thread.getChannel("serialout"):push(string.char(port11))
 				end
 				--oq[#oq + 1] = string.char(port11)
 			elseif v == 2 then
@@ -132,6 +192,10 @@ function serial.new(vm, c, bus)
 
 	if s.num == 0 then
 		vm.registerOpt("-serial,stdio", function (arg, i)
+			if tcpo then
+				error("-serial,stdio and -serial,tcp are mutually exclusive")
+			end
+
 			stdo = true
 
 			love.thread.newThread(tc):start()
@@ -146,6 +210,29 @@ function serial.new(vm, c, bus)
 			end)
 
 			return 1
+		end)
+
+		vm.registerOpt("-serial,tcp", function (arg, i)
+			if stdo then
+				error("-serial,stdio and -serial,tcp are mutually exclusive")
+			end
+
+			tcpo = true
+
+			love.thread.getChannel("serialin"):push(tonumber(arg[i+1]))
+
+			love.thread.newThread(tcpt):start()
+
+			vm.registerCallback("update", function (dt)
+				local x = love.thread.getChannel("serialin"):pop()
+				while x do
+					s.stream(x)
+
+					x = love.thread.getChannel("serialin"):pop()
+				end
+			end)
+
+			return 2
 		end)
 	end
 

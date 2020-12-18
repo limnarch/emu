@@ -28,7 +28,7 @@ end
 
 
 function lsign(v)
-	if getBit(v, 31) == 1 then
+	if band(v, 0x80000000) ~= 0 then
 		return -(band(bnot(v)+1, 0xFFFFFFFF))
 	else
 		return v
@@ -36,7 +36,7 @@ function lsign(v)
 end
 
 function tsign(v)
-    if getBit(v, 23) == 1 then
+    if band(v, 0x800000) == 0x800000 then
         return -(band(bnot(v)+1, 0xFFFFFF))
     else
         return v
@@ -44,7 +44,7 @@ function tsign(v)
 end
 
 function isign(v)
-    if getBit(v, 15) == 1 then
+    if band(v, 0x8000) == 0x8000 then
         return -(band(bnot(v)+1, 0xFFFF))
     else
         return v
@@ -52,7 +52,7 @@ function isign(v)
 end
 
 function bsign(v)
-    if getBit(v, 7) == 1 then
+    if band(v, 0x80) == 0x80 then
         return -(band(bnot(v)+1, 0xFF))
     else
         return v
@@ -60,7 +60,7 @@ function bsign(v)
 end
 
 function tensign(v) -- 10 bit offsets for limn2k
-    if getBit(v, 9) == 1 then
+    if band(v, 0x200) == 0x200 then
         return -(band(bnot(v)+1, 0x3FF))
     else
         return v
@@ -68,7 +68,7 @@ function tensign(v) -- 10 bit offsets for limn2k
 end
 
 function twsxsign(v) -- 26 bit offsets for limn2k
-    if getBit(v, 25) == 1 then
+    if band(v, 0x2000000) == 0x2000000 then
         return -(band(bnot(v)+1, 0x3FFFFFF))
     else
         return v

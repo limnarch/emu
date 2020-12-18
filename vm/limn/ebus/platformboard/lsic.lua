@@ -41,7 +41,7 @@ function ic.new(vm, c)
 			if t == 0 then -- claim
 				local ni = 0
 
-				for i = 1, 63 do
+				for i = 63, 1, -1 do
 					if getBit(cnr[math.floor(i/32) + 2], i % 32) == 1 then
 						ni = i
 						break
