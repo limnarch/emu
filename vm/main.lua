@@ -308,12 +308,16 @@ function mouseCapture()
 	love.mouse.setVisible(false)
 	love.mouse.setGrabbed(true)
 	love.mouse.setRelativeMode(true)
+
+	love.window.setTitle("limnemu - press F12 to uncapture mouse")
 end
 
 function mouseUncapture()
 	love.mouse.setVisible(true)
 	love.mouse.setGrabbed(false)
 	love.mouse.setRelativeMode(false)
+
+	love.window.setTitle("limnemu")
 end
 
 function love.keypressed(key, t, isrepeat)
