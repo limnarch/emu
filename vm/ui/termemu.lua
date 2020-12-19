@@ -1,18 +1,20 @@
 local termemu = {}
 
-function termemu.new(stream, num)
+function termemu.new(vm, stream, num)
 	local s = {}
 
 	local fw = 8
 	local fh = 14
 
-	local m = fw*8
+	-- local m = fw*6
+	local m = 0
 	local m2 = m * 2
 
 	local cw = 80
 	local ch = 25
 
-	s.swindow = window.new("TTY "..tostring(num), cw * fw + m2, ch * fh + m2)
+	s.screenWidth = (fw*cw + m2)
+	s.screenHeight = (fh*ch + m2)
 
 	s.font = love.graphics.newFont("ui/terminus.ttf", fh)
 
@@ -36,7 +38,7 @@ function termemu.new(stream, num)
 		["-"] = 31,
 	}
 
-	function s.swindow:keypressed(key, t)
+	function s.keypressed(key, t)
 		if love.keyboard.isDown("lctrl") then
 			local e = ctrlkeys[t]
 
@@ -52,7 +54,7 @@ function termemu.new(stream, num)
 		end
 	end
 
-	function s.swindow:textinput(text)
+	function s.textinput(text)
 		if not love.keyboard.isDown("lctrl") then
 			stream(text)
 		end
@@ -69,6 +71,8 @@ function termemu.new(stream, num)
 
 	local curbg = s.bgc
 	local curfg = s.fgc
+
+	s.background = s.bgc
 
 	local darkcolors = {
 		[0] = {0x19/0xFF,0x19/0xFF,0x19/0xFF},
@@ -250,20 +254,23 @@ function termemu.new(stream, num)
 		end
 	end
 
-	local function draw(_, dx, dy)
+	function s.draw(dt)
+		local sw, sh = love.window.getMode()
+
+		local mw, mh = (fw*cw + m2)*vm.scale, (fh*ch + m2)*vm.scale
+
+		local bx = math.floor((sw/2) - (mw/2))
+		local by = math.floor((sh/2) - (mh/2))
+
 		love.graphics.setColor(s.bgc[1], s.bgc[2], s.bgc[3], 1)
-		love.graphics.rectangle("fill", dx, dy, fw * cw + m2, fh * ch + m2)
+		love.graphics.rectangle("fill", bx, by, mw, mh)
 
 		love.graphics.setColor(1, 1, 1, 1)
-		love.graphics.draw(s.canvas, dx+m, dy+m)
+		love.graphics.draw(s.canvas, bx+m*vm.scale, by+m*vm.scale, 0, vm.scale, vm.scale)
 
 		love.graphics.setColor(s.fgc[1], s.fgc[2], s.fgc[3], 1)
-		love.graphics.rectangle("fill", s.x*fw + dx + m, s.y*fh + dy + m, fw, fh)
+		love.graphics.rectangle("fill", (s.x*fw+m)*vm.scale + bx, (s.y*fh+m)*vm.scale + by, fw*vm.scale, fh*vm.scale)
 	end
-
-	local wc = s.swindow:addElement(window.canvas(s.swindow, draw, cw * fw, ch * fh))
-	wc.x = 0
-	wc.y = 20
 
 	return s
 end

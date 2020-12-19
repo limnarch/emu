@@ -78,6 +78,9 @@ function gpu.new(vm, c, page, intn)
 		image = love.graphics.newImage(imageData)
 
 		registers[0] = bor(lshift(band(height, 0xFFF), 12), band(width, 0xFFF))
+
+		c.screenWidth = w
+		c.screenHeight = h
 	end
 
 	initw(1024, 768)
@@ -86,10 +89,6 @@ function gpu.new(vm, c, page, intn)
 
 	vm.registerOpt("-limngfx,size", function (arg, i)
 		initw(arg[i+1], arg[i+2])
-
-		if c.window then
-			c.window:setDim(width, height)
-		end
 
 		return 3
 	end)
@@ -610,135 +609,138 @@ function gpu.new(vm, c, page, intn)
 
 	local init
 
-	if c.window then
-		c.window.gc = true
+	function c.draw()
+		local sw, sh = love.window.getMode()
 
-		local y = c.window.h
+		local mw, mh = width*vm.scale, height*vm.scale
 
-		local wc = c.window:addElement(window.canvas(c.window, function (self, x, y)
-			local curw = band(registers[4], 0xFFF)
-			local curh = band(rshift(registers[4], 12), 0xFFF)
+		local bx = (sw/2) - (mw/2)
+		local by = (sh/2) - (mh/2)
 
-			if curdirty then
-				if (curw * curh) < 1024 then
-					if curimage then
-						curimage:release()
-					end
+		local curw = band(registers[4], 0xFFF)
+		local curh = band(rshift(registers[4], 12), 0xFFF)
 
-					local imageData = love.image.newImageData(curw, curh)
-
-					imageData:mapPixel(function (x,y,r,g,b,a)
-						local pix = (y * curw * 2) + (x * 2)
-
-						local c = curbmp[pix+1] * 0x100 + curbmp[pix]
-
-						if band(c, 0x8000) == 0x8000 then
-							return 0,0,0,0
-						else
-							local e = palette[band(c, 0x7FFF)]
-
-							return e.r/255,e.g/255,e.b/255,1
-						end
-					end, 0, 0, curw, curh)
-
-					curimage = love.graphics.newImage(imageData)
-
-					imageData:release()
+		if curdirty then
+			if (curw * curh) < 1024 then
+				if curimage then
+					curimage:release()
 				end
 
-				curdirty = false
-			end
-
-			if dirty then
-				init = true
-
-				local uw, uh = dirtyWindowX1 - dirtyWindowX + 1, dirtyWindowY1 - dirtyWindowY + 1
-
-				if (uw == 0) or (uh == 0) then
-					dirty = false
-
-					return
-				end
-
-				local imageData = love.image.newImageData(uw, uh)
-
-				local base = (dirtyWindowY * width) + (dirtyWindowX)
+				local imageData = love.image.newImageData(curw, curh)
 
 				imageData:mapPixel(function (x,y,r,g,b,a)
-					local pix = base + (y * width) + x
+					local pix = (y * curw * 2) + (x * 2)
 
-					local e = palette[band(vram[pix], 0x7FFF)]
+					local c = curbmp[pix+1] * 0x100 + curbmp[pix]
 
-					return e.r/255,e.g/255,e.b/255,1
-				end, 0, 0, uw, uh)
+					if band(c, 0x8000) == 0x8000 then
+						return 0,0,0,0
+					else
+						local e = palette[band(c, 0x7FFF)]
 
-				image:replacePixels(imageData, nil, nil, dirtyWindowX, dirtyWindowY)
+						return e.r/255,e.g/255,e.b/255,1
+					end
+				end, 0, 0, curw, curh)
+
+				curimage = love.graphics.newImage(imageData)
 
 				imageData:release()
+			end
 
+			curdirty = false
+		end
+
+		if dirty then
+			init = true
+
+			local uw, uh = dirtyWindowX1 - dirtyWindowX + 1, dirtyWindowY1 - dirtyWindowY + 1
+
+			if (uw == 0) or (uh == 0) then
 				dirty = false
+
+				return
 			end
 
-			love.graphics.setColor(1,1,1,1)
-			love.graphics.draw(image, x, y, 0)
-			
-			if not init then
-				love.graphics.setColor(0.5,0.2,0.3,1)
-				love.graphics.print("limngfx: vram not initialized by guest.", x + 10, y + 10)
-				love.graphics.setColor(1,1,1,1)
-			end
+			local imageData = love.image.newImageData(uw, uh)
 
-			if (curimage and (curw > 0) and (curh > 0)) and (band(registers[4], 0x1000000) == 0x1000000) then
-				local curx = band(registers[8], 0xFFF)
-				local cury = band(rshift(registers[8], 12), 0xFFF)
+			local base = (dirtyWindowY * width) + (dirtyWindowX)
 
-				love.graphics.draw(curimage, x+curx, y+cury, 0)
-			end
-
-			if band(registers[6], 1) == 1 then -- vsync
-				int(1)
-			end
-		end, width, height))
-
-		wc.x = 0
-		wc.y = y
-
-		c.window:open()
-
-		vm.registerCallback("update", function (dt)
-			if runfunc then
-				if pixThisFrame < pixPerFrame then
-					runfunc(pixPerFrame-pixThisFrame)
-				end
-			elseif registers[2] < registers[3] then
-				executelist()
-			end
-
-			pixThisFrame = 0
-		end)
-
-		local fbdwindow = vm.window.new("!! SCREENSHOT !!", 100, 100)
-
-		function fbdwindow:opened()
-			-- take a SCREENSHOT
-
-			self:close()
-
-			local tid = love.image.newImageData(width, height)
-
-			tid:mapPixel(function (x,y,r,g,b,a)
-				local pix = y * width + x
+			imageData:mapPixel(function (x,y,r,g,b,a)
+				local pix = base + (y * width) + x
 
 				local e = palette[band(vram[pix], 0x7FFF)]
 
 				return e.r/255,e.g/255,e.b/255,1
-			end)
+			end, 0, 0, uw, uh)
 
-			local fd = tid:encode("png", "LIMNGFX.png")
+			image:replacePixels(imageData, nil, nil, dirtyWindowX, dirtyWindowY)
 
-			tid:release()
+			imageData:release()
+
+			dirty = false
+		end
+
+		love.graphics.setColor(1,1,1,1)
+		love.graphics.draw(image, bx, by, 0, vm.scale, vm.scale)
+		
+		if not init then
+			love.graphics.setColor(0.5,0.2,0.3,1)
+			love.graphics.print("limngfx: vram not initialized by guest.", 10, 10)
+			love.graphics.setColor(1,1,1,1)
+		end
+
+		if (curimage and (curw > 0) and (curh > 0)) and (band(registers[4], 0x1000000) == 0x1000000) then
+			local curx = band(registers[8], 0xFFF)
+			local cury = band(rshift(registers[8], 12), 0xFFF)
+
+			love.graphics.draw(curimage, bx+curx*vm.scale, by+cury*vm.scale, 0, vm.scale, vm.scale)
+		end
+
+		if band(registers[6], 1) == 1 then -- vsync
+			int(1)
 		end
 	end
+
+	c.screenname = "LIMNGFX"
+
+	vm.registerCallback("update", function (dt)
+		if runfunc then
+			if pixThisFrame < pixPerFrame then
+				runfunc(pixPerFrame-pixThisFrame)
+			end
+		elseif registers[2] < registers[3] then
+			executelist()
+		end
+
+		pixThisFrame = 0
+	end)
+
+	local function screenshot()
+		-- take a SCREENSHOT
+
+		local tid = love.image.newImageData(width, height)
+
+		tid:mapPixel(function (x,y,r,g,b,a)
+			local pix = y * width + x
+
+			local e = palette[band(vram[pix], 0x7FFF)]
+
+			return e.r/255,e.g/255,e.b/255,1
+		end)
+
+		local fd = tid:encode("png", "LIMNGFX.png")
+
+		tid:release()
+	end
+
+	local controls = {
+		{
+			["name"] = "Take Screenshot",
+			["func"] = screenshot
+		},
+	}
+
+	controlUI.add("LIMNGFX", nil, controls)
 
 	return v
 end

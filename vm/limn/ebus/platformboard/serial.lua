@@ -238,19 +238,9 @@ function serial.new(vm, c, bus)
 
 	ports = ports + 1
 
-	if not window then
-		return s
-	end
+	s.termemu = termemu.new(vm, s.stream, s.num)
 
-	s.termemu = termemu.new(s.stream, s.num)
-
-	if s.num == 0 then
-		vm.registerOpt("-serial,wopen", function (arg, i)
-			s.termemu.swindow:open()
-
-			return 1
-		end)
-	end
+	vm.addBigScreen("tty"..s.num, s.termemu)
 
 	return s
 end

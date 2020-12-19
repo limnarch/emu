@@ -4,7 +4,9 @@ require("misc")
 
 loff = require("loff")
 
-window = require("ui/window")
+Slab = require("ui/Slab")
+
+controlUI = require("ui/controlui")
 
 --[[
 	Virtual machine
@@ -30,6 +32,8 @@ vm.cb.update = {}
 vm.cb.draw = {}
 vm.cb.quit = {}
 
+local controlui = false
+
 local timed = false
 
 function vm.registerCallback(t, cb)
@@ -43,7 +47,7 @@ vm.timed = {}
 
 function vm.registerTimed(sec, handler)
 	if timed then
-		vm.timed[#vm.timed+1] = {sec, handler}
+		vm.timed[#vm.timed + 1] = {sec, handler}
 		return vm.timed[#vm.timed]
 	else
 		handler()
@@ -57,7 +61,44 @@ function vm.registerOpt(name, handler)
 	vm.optcb[name] = handler
 end
 
+vm.bigscreen = {}
+
+function vm.addBigScreen(name, bs)
+	bs.screenname = name
+
+	vm.bigscreen[#vm.bigscreen + 1] = bs
+end
+
 local dbmsg = false
+
+local selectedbig = 0
+
+function winterest(scale)
+	scale = scale or 1
+
+	local big = vm.bigscreen[selectedbig]
+
+	if big then
+		local ows = {}
+		ows.width, ows.height, ows.flags = love.window.getMode()
+
+		local wi,he = big.screenWidth, big.screenHeight
+
+		-- some hacks to keep the window centered (depends on platform's coordinates system being sane)
+		local wd = wi*scale - ows.width
+		local hd = he*scale - ows.height
+
+		ows.flags.x = ows.flags.x - wd/2
+		ows.flags.y = ows.flags.y - hd/2
+
+		ows.width = wi*scale
+		ows.height = he*scale
+
+		-- ows.flags.borderless = true
+
+		love.window.setMode(ows.width, ows.height, ows.flags)
+	end
+end
 
 function love.load(arg)
 	vm.log = require("log").init(vm)
@@ -96,22 +137,46 @@ function love.load(arg)
 		end
 	end
 
+	if vm.computer.draw then
+		vm.bigscreen[0] = vm.computer
+		selectedbig = 0
+	else
+		selectedbig = 1
+	end
+
+	local sb = vm.bigscreen[selectedbig]
+
+	if sb then
+		local bg = sb.background
+
+		if bg then
+			love.graphics.setBackgroundColor(bg[1], bg[2], bg[3])
+		else
+			love.graphics.setBackgroundColor(0, 0, 0)
+		end
+	end
+
+	local monofont = love.graphics.newFont("ui/terminus.ttf")
+
+	Slab.SetINIStatePath(nil)
+
+	Slab.Initialize(args)
+
+	Slab.PushFont(monofont)
+
 	vm.instructionsPerTick = math.floor(vm.hz / vm.targetfps)
 
 	vm.errPerTick = vm.hz/vm.targetfps - vm.instructionsPerTick
 
 	love.keyboard.setKeyRepeat(true)
 
-	if window then
-		window.pack()
-		window.winterest()
-	end
-
 	cycle = vm.computer.cpu.cycle
 
 	ipt = vm.instructionsPerTick
 
 	ept = vm.errPerTick
+
+	winterest(vm.scale)
 end
 
 local cycles = 0
@@ -123,6 +188,11 @@ local timesran = 0
 local lticks = 0
 
 local err = 0
+
+local alert = {
+	["timeleft"] = 0,
+	["name"] = "",
+}
 
 function love.update(dt)
 	timesran = timesran + 1
@@ -172,42 +242,187 @@ function love.update(dt)
 	end
 
 	usedt = usedt + dt
+
+	if controlui then
+		Slab.Update(dt)
+
+		controlUI.draw()
+	end
+
+	if alert.timeleft > 0 then
+		alert.timeleft = alert.timeleft - dt
+	end
 end
 
-function love.draw()
-	window.draw()
+local alerttime = 1.25
+local alertopaquetime = 0.75
+
+local alertfadetime = alerttime - alertopaquetime
+
+function love.draw(dt)
+	local big = vm.bigscreen[selectedbig]
+
+	if big and big.draw then
+		big.draw(dt, big)
+	end
+
+	if alert.timeleft > 0 then
+		local font = love.graphics.getFont()
+
+		local sw, sh = love.window.getMode()
+
+		local alertw = font:getWidth(alert.name)*3
+
+		local alerth = font:getHeight()*3+5
+
+		local alertcrw = alertw/10
+		local alertcrh = alerth/10
+
+		local mx, my = math.floor((sw/2)-(alertw/2)), sh - alerth - 10
+
+		local a = 1
+
+		if alert.timeleft < alertopaquetime then
+			a = alert.timeleft / alertopaquetime
+		end
+
+		love.graphics.setColor(0,0,0,a)
+
+		love.graphics.rectangle("fill", mx, my, alertw, alerth, alertcrw, alertcrh)
+
+		love.graphics.setColor(1,1,1,a)
+
+		love.graphics.print(alert.name, mx, my, 0, 3)
+
+		love.graphics.setColor(1,1,1,1)
+	end
+
+	if controlui then
+		Slab.Draw(dt)
+	end
+end
+
+local mousecaptured = false
+
+function mouseCapture()
+	love.mouse.setVisible(false)
+	love.mouse.setGrabbed(true)
+	love.mouse.setRelativeMode(true)
+end
+
+function mouseUncapture()
+	love.mouse.setVisible(true)
+	love.mouse.setGrabbed(false)
+	love.mouse.setRelativeMode(false)
 end
 
 function love.keypressed(key, t, isrepeat)
-	window.keypressed(key, t)
+	local big = vm.bigscreen[selectedbig]
+
+	if (key == "rctrl") and mousecaptured then
+		mouseUncapture()
+		mousecaptured = false
+	elseif (key == "rctrl") and (not controlui) then
+		controlui = true
+		Slab.enabled = true
+	elseif (key == "escape") and controlui then
+		controlui = false
+		Slab.enabled = false
+	elseif controlui then
+
+	elseif key == "f12" then
+		local old = vm.bigscreen[selectedbig]
+
+		if selectedbig >= #vm.bigscreen then
+			if vm.bigscreen[0] then
+				selectedbig = 0
+			else
+				selectedbig = 1
+			end
+		else
+			selectedbig = selectedbig + 1
+		end
+
+		local sb = vm.bigscreen[selectedbig]
+
+		if sb and (sb ~= old) then
+			local bg = sb.background
+
+			if bg then
+				love.graphics.setBackgroundColor(bg[1], bg[2], bg[3])
+			else
+				love.graphics.setBackgroundColor(0, 0, 0)
+			end
+
+			alert.timeleft = alerttime
+			alert.name = sb.screenname
+		end
+	elseif big and big.keypressed then
+		big.keypressed(key, t, big)
+	end
 end
 
 function love.keyreleased(key, t)
-	window.keyreleased(key, t)
+	local big = vm.bigscreen[selectedbig]
+
+	if controlui then
+
+	elseif big and big.keyreleased then
+		big.keyreleased(key, t, big)
+	end
 end
 
 function love.mousepressed(x, y, button)
-	window.mousepressed(x, y, button)
+	if controlui then
+
+	elseif not mousecaptured then
+		mouseCapture()
+		mousecaptured = true
+	elseif vm.computer.mousepressed then
+		vm.computer.mousepressed(x, y, button)
+	end
 end
 
 function love.mousereleased(x, y, button)
-	window.mousereleased(x, y, button)
+	if controlui then
+
+	elseif mousecaptured and vm.computer.mousereleased then
+		vm.computer.mousereleased(x, y, button)
+	end
 end
 
 function love.mousemoved(x, y, dx, dy, istouch)
-	window.mousemoved(x, y, dx, dy)
+	if controlui then
+
+	elseif mousecaptured and vm.computer.mousemoved then
+		vm.computer.mousemoved(x, y, dx, dy)
+	end
 end
 
 function love.wheelmoved(x, y)
-	window.wheelmoved(x, y)
+	if controlui then
+
+	elseif mousecaptured and vm.computer.wheelmoved then
+		vm.computer.wheelmoved(x, y)
+	end
 end
 
 function love.textinput(text)
-	window.textinput(text)
+	local big = vm.bigscreen[selectedbig]
+
+	if controlui then
+
+	elseif big and big.textinput then
+		big.textinput(text, big)
+	end
 end
 
 function love.filedropped(file)
-	window.filedropped(file)
+	if controlui then
+
+	elseif vm.computer.filedropped then
+		vm.computer.filedropped(file)
+	end
 end
 
 function love.quit()

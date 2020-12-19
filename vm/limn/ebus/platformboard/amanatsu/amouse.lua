@@ -64,29 +64,25 @@ function mouse.new(vm, c)
 		return true
 	end
 
-	if c.window then
-		c.window.captureMouse = true
+	function c.mousepressed(x, y, button)
+		mp = button
+		int()
+	end
 
-		function c.window:mousepressed(x, y, button)
-			mp = button
-			int()
-		end
+	function c.mousereleased(x, y, button)
+		if ignore then ignore = false return end
 
-		function c.window:mousereleased(x, y, button)
-			if ignore then ignore = false return end
+		mr = button
+		int()
+	end
 
-			mr = button
-			int()
-		end
+	function c.mousemoved(x, y, dxe, dye)
+		dx = dx + dxe
+		dy = dy + dye
 
-		function c.window:mousemoved(x, y, dxe, dye)
-			dx = dx + dxe
-			dy = dy + dye
+		move = bor(lshift(fmtn(dx), 16), fmtn(dy))
 
-			move = bor(lshift(fmtn(dx), 16), fmtn(dy))
-
-			int()
-		end
+		int()
 	end
 
 	function m.reset()

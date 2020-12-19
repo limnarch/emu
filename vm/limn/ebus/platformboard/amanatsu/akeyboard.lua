@@ -149,21 +149,19 @@ function keydev.new(vm, c)
 		return true
 	end
 
-	if c.window then
-		function c.window.keypressed(key, t)
-			if layout.m[t] then
-				int()
-				outstandingp[layout.m[t]] = true
-				pressed[layout.m[t]] = true
-			end
+	function c.keypressed(key, t)
+		if layout.m[t] then
+			int()
+			outstandingp[layout.m[t]] = true
+			pressed[layout.m[t]] = true
 		end
+	end
 
-		function c.window.keyreleased(key, t)
-			if layout.m[t] then
-				int()
-				outstandingr[layout.m[t]] = true
-				pressed[layout.m[t]] = false
-			end
+	function c.keyreleased(key, t)
+		if layout.m[t] then
+			int()
+			outstandingr[layout.m[t]] = true
+			pressed[layout.m[t]] = false
 		end
 	end
 

@@ -2133,50 +2133,97 @@ function cpu.new(vm, c)
 		return 2
 	end)
 
-	if vm.window then
-		p.window = vm.window.new("CPU Registers", 10*15, 10*40)
-
-		local function draw(_, dx, dy)
-			love.graphics.setColor(1,1,1,1)
-			love.graphics.rectangle("fill", dx, dy, 10*15, 10*40+20)
-			love.graphics.setColor(0,0,0,1)
-			love.graphics.print(p.mkrs(), dx, dy)
-		end
-
-		local wc = p.window:addElement(window.canvas(p.window, draw, p.window.w, p.window.h))
-		wc.x = 0
-		wc.y = 20
-
-		function p.window:keypressed(key, t)
-			if key == "return" then
-				running = not running
-
-				if running and halted then
-					halted = false
+	if controlUI then
+		local controls = {
+			{
+				["name"] = "Send NMI",
+				["func"] = function ()
+					userbreak = true
 				end
-			elseif key == "escape" then
-				userbreak = true
-			elseif key == "r" then
-				halted = false
-				running = true
-				p.reset()
-			elseif key == "c" then
-				collectgarbage()
+			},
+			{
+				["name"] = "Reset",
+				["func"] = function ()
+					halted = false
+					running = true
+					p.reset()
+				end
+			}
+		}
+
+		local pausecontrol
+
+		pausecontrol = {
+			["name"] = "Pause",
+			["func"] = function ()
+				if running then
+					pausecontrol.name = "Unpause"
+					running = false
+				else
+					pausecontrol.name = "Pause"
+					running = true
+				end
 			end
+		}
+
+		controls[#controls + 1] = pausecontrol
+
+		local function drawregs()
+			Slab.BeginLayout("regs", {["Columns"]=2})
+
+			Slab.SetLayoutColumn(1)
+
+			for i = 0, 22 do
+				Slab.Text(string.format("%7s %08x", p.regmnem[i+1], r[i]))
+
+				--if (i == 31) or (i == 38) or (i == 37) or (i == 30) then
+				--	local sym,off = p.loffsym(r[i])
+				--	if sym then
+				--		Slab.Textf(gsymstr(sym,off))
+				--	end
+				--end
+			end
+
+			Slab.SetLayoutColumn(2)
+
+			for i = 23, 45 do
+				Slab.Text(string.format("%7s %08x", p.regmnem[i+1], r[i]))
+
+				--if (i == 31) or (i == 38) or (i == 37) or (i == 30) then
+				--	local sym,off = p.loffsym(r[i])
+				--	if sym then
+				--		Slab.Textf(gsymstr(sym,off))
+				--	end
+				--end
+			end
+
+			Slab.EndLayout()
 		end
 
-		p.tlbwindow = vm.window.new("TLB", 10*51, 10*44)
+		controlUI.add("CPU Control", drawregs, controls)
 
-		local wc = p.tlbwindow:addElement(window.canvas(p.tlbwindow, function (_, dx, dy)
-			love.graphics.setColor(0,0,0,1)
-			love.graphics.rectangle("fill", dx, dy, 10*51, 10*44+20)
-			love.graphics.setColor(1,1,1,1)
-			love.graphics.print(p.mktlbs(), dx+8, dy+20)
-		end, p.tlbwindow.w, p.tlbwindow.h))
-		wc.x = 0
-		wc.y = 20
+		local function drawtlb()
+			Slab.BeginLayout("bigcol", {["Columns"]=2})
 
-		--p.window.open(p.window)
+			for i = 0, 63 do
+				local tlblo = tlb[i]
+				local tlbhi = tlb[i+1]
+
+				local tlbvpn = band(tlblo, 0xFFFFF)
+				local asid = rshift(tlblo, 20)
+
+				local ppn = rshift(tlbhi, 4)
+				local flags = band(tlbhi, 15)
+
+				if band(tlbhi,1) == 1 then
+					s = s .. string.format(fmt, tlbvpn, ppn, asid, flags)
+				else
+					Slab.Text("")
+				end
+			end
+
+			Slab.EndLayout()
+		end
 	end
 
 	return p
