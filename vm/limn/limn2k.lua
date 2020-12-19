@@ -2202,10 +2202,41 @@ function cpu.new(vm, c)
 
 		controlUI.add("CPU Control", drawregs, controls)
 
-		local function drawtlb()
-			Slab.BeginLayout("bigcol", {["Columns"]=2})
+		local tlbflags = {
+			[0]  = "    ",
+			[1]  = "  RV",
+			[2]  = "    ",
+			[3]  = "  WV",
+			[4]  = "    ",
+			[5]  = " ?RV",
+			[6]  = "    ",
+			[7]  = " ?WV",
+			[8]  = "    ",
+			[9]  = "? RV",
+			[10] = "    ",
+			[11] = "? WV",
+			[12] = "    ",
+			[13] = "??RV",
+			[14] = "    ",
+			[15] = "??WV",
+		}
 
-			for i = 0, 63 do
+		local function drawtlb()
+			Slab.BeginLayout("tlb", {["Columns"]=2})
+
+			Slab.SetLayoutColumn(1)
+
+			Slab.Text("VirPN PhyPN ASN FLAG")
+
+			Slab.SetLayoutColumn(2)
+
+			Slab.Text("VirPN PhyPN ASN FLAG")
+
+			local d = 0
+
+			for i = 0, 127, 2 do
+				Slab.SetLayoutColumn(d%2 + 1)
+
 				local tlblo = tlb[i]
 				local tlbhi = tlb[i+1]
 
@@ -2215,15 +2246,26 @@ function cpu.new(vm, c)
 				local ppn = rshift(tlbhi, 4)
 				local flags = band(tlbhi, 15)
 
-				if band(tlbhi,1) == 1 then
-					s = s .. string.format(fmt, tlbvpn, ppn, asid, flags)
-				else
-					Slab.Text("")
-				end
+				Slab.Text(string.format("%05X %05X %03x %s ", tlbvpn, ppn, asid, tlbflags[flags]))
+
+				d = d + 1
 			end
 
 			Slab.EndLayout()
 		end
+
+		local tlbcontrols = {
+			{
+				["name"] = "Clear",
+				["func"] = function ()
+					for i = 0, 127 do
+						tlb[i] = 0
+					end
+				end
+			},
+		}
+
+		controlUI.add("TLB", drawtlb, tlbcontrols)
 	end
 
 	return p

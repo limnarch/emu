@@ -234,7 +234,7 @@ function nvram.new(vm, c)
 
 		controlUI.add("NVRAM", draw, controls,
 			{["AllowResize"] = true, ["AutoSizeWindow"] = false,
-			["W"] = 200, ["H"] = 150})
+			["W"] = 200, ["H"] = 400})
 	end
 
 	return nr
