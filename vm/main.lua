@@ -319,10 +319,10 @@ end
 function love.keypressed(key, t, isrepeat)
 	local big = vm.bigscreen[selectedbig]
 
-	if (key == "rctrl") and mousecaptured then
+	if (key == "f12") and mousecaptured then
 		mouseUncapture()
 		mousecaptured = false
-	elseif (key == "rctrl") and (not controlui) then
+	elseif (key == "f12") and (not controlui) then
 		controlui = true
 		Slab.enabled = true
 	elseif (key == "escape") and controlui then
@@ -330,7 +330,7 @@ function love.keypressed(key, t, isrepeat)
 		Slab.enabled = false
 	elseif controlui then
 
-	elseif key == "f12" then
+	elseif key == "rctrl" then
 		local old = vm.bigscreen[selectedbig]
 
 		if selectedbig >= #vm.bigscreen then
@@ -418,9 +418,7 @@ function love.textinput(text)
 end
 
 function love.filedropped(file)
-	if controlui then
-
-	elseif vm.computer.filedropped then
+	if vm.computer.filedropped then
 		vm.computer.filedropped(file)
 	end
 end

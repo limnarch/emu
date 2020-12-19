@@ -201,8 +201,7 @@ function ahdb.new(vm, c, bus)
 
 				-- no valid drive selected, bus error
 				if not d then
-					log("satsuma buserror on read")
-					c.cpu.buserror()
+					log("satsuma error on read")
 					return
 				end
 
@@ -234,8 +233,7 @@ function ahdb.new(vm, c, bus)
 
 				-- no valid drive selected, bus error
 				if not d then
-					log("satsuma buserror on write")
-					c.cpu.buserror()
+					log("satsuma error on write")
 					return
 				end
 
@@ -332,21 +330,71 @@ function ahdb.new(vm, c, bus)
 		return 2
 	end)
 
-	vm.registerCallback("filedropped", function (file)
+	local changed = false
+
+	function c.filedropped(file)
 		local image = file:getFilename()
 
 		local x,y = b.attach()
 
 		if not x then
-			print("couldn't attach image "..image)
+			log("couldn't attach image "..image)
+			return 2
 		else
-			print(string.format("image %s on dks%d", image, x))
+			log(string.format("image %s on dks%d", image, x))
 		end
 
 		y:image(image)
 
+		changed = true
+
 		return 2
-	end)
+	end
+
+	if controlUI then
+		local selected
+
+		local function draw()
+			Slab.BeginListBox("dks", {["StretchW"]=true, ["StretchH"]=true, ["Clear"]=changed})
+
+			changed = false
+
+			for i = 0, 7 do
+				local disk = b.drives[i]
+
+				if disk then
+					Slab.BeginListBoxItem("dks_"..disk.block.image..i, {["Selected"] = (selected == i)})
+
+					Slab.Text(string.format("%d %s", i, disk.block.image))
+
+					if Slab.IsListBoxItemClicked() then
+						selected = i
+					end
+
+					Slab.EndListBoxItem()
+				end
+			end
+
+			Slab.EndListBox()
+		end
+
+		local controls = {
+			{
+				["name"] = "Remove Disk",
+				["func"] = function ()
+					changed = true
+
+					if selected and b.drives[selected] then
+						b.drives[selected]:eject()
+					end
+
+					selected = nil
+				end,
+			}
+		}
+
+		controlUI.add("DKS", draw, controls, {["H"] = 200, ["AutoSizeWindow"] = false})
+	end
 
 	return b
 end

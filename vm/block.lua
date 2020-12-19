@@ -8,6 +8,8 @@ local block = {}
 function block.new(image, blocksize)
 	local bd = {}
 
+	bd.image = image
+
 	bd.bs = blocksize
 
 	bd.file = io.open(image, "rb+")
