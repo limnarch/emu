@@ -96,9 +96,9 @@ function serial.new(vm, c, bus)
 	local intnum
 
 	if s.num == 0 then
-		intnum = 0x3
+		intnum = 0x4
 	elseif s.num == 1 then
-		intnum = 0x18
+		intnum = 0x5
 	end
 
 	local iq = {}

@@ -172,7 +172,7 @@ function ahdb.new(vm, c, bus)
 		infodetails = details
 
 		if doint then
-			int(0x2)
+			int(0x3)
 		end
 	end
 

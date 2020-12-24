@@ -14,11 +14,19 @@ function ic.new(vm, c)
 			error("bad interrupt source")
 		end
 
-		local r = math.floor(src/32) + 2
+		local srcbmp = rshift(src, 5)
 
-		cnr[r] = setBit(cnr[r], src % 32, 1)
+		local srcbmpoff = band(src, 31)
 
-		cn.interrupting = true
+		local ri = srcbmp + 2
+
+		cnr[ri] = setBit(cnr[ri], srcbmpoff, 1)
+
+		local rm = srcbmp
+
+		if band(rshift(cnr[rm], srcbmpoff), 1) == 0 then
+			cn.interrupting = true
+		end
 	end
 	c.int = cn.int -- set computer's interrupt function to mine
 
@@ -41,8 +49,13 @@ function ic.new(vm, c)
 			if t == 0 then -- claim
 				local ni = 0
 
-				for i = 63, 1, -1 do
-					if getBit(cnr[math.floor(i/32) + 2], i % 32) == 1 then
+				for i = 1, 63 do
+					local bmp = rshift(i, 5)
+
+					local bmpoff = band(i, 31)
+
+					if getBit(band(bnot(cnr[bmp]), cnr[bmp + 2]), bmpoff) == 1 then
+						-- isn't masked and is interrupting
 						ni = i
 						break
 					end
@@ -54,12 +67,24 @@ function ic.new(vm, c)
 					return false
 				end
 
-				local rg = math.floor(v/32) + 2
+				local rg = rshift(v, 5) + 2
 
-				cnr[rg] = setBit(cnr[rg], v % 32, 0)
+				cnr[rg] = setBit(cnr[rg], band(v, 31), 0)
 
-				if (cnr[2] == 0) and (cnr[3] == 0) then
+				if (band(bnot(cnr[0]), cnr[2]) == 0) and (band(bnot(cnr[1]), cnr[3]) == 0) then
 					cn.interrupting = false
+				end
+			end
+		elseif r < 4 then -- masks and interrupt sources
+			if t == 0 then
+				return cnr[r]
+			elseif t == 1 then
+				cnr[r] = v
+
+				if (band(bnot(cnr[0]), cnr[2]) == 0) and (band(bnot(cnr[1]), cnr[3]) == 0) then
+					cn.interrupting = false
+				else
+					cn.interrupting = true
 				end
 			end
 		else

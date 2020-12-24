@@ -114,7 +114,7 @@ function pbus.new(vm, c, b)
 	function bcon.action(v)
 		if v == 1 then -- enable interrupts on device
 			if dev[bcon.portB] then
-				dev[bcon.portB].intn = 4 + bcon.portB
+				dev[bcon.portB].intn = 48 + bcon.portB
 			end
 		elseif v == 2 then -- reset
 			a.reset()

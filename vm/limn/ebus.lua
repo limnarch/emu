@@ -13,7 +13,7 @@ function bus.new(vm, c, aligned)
 	b.reseth = {}
 	local reseth = b.reseth
 
-	--areas (also called branches) are 128mb pages of translated address space that
+	--areas (also called branches) are 128mb pages of physical address space that
 	--call back to a handler when accessed.
 	--they're a bit of a bottleneck. there's probably
 	--a better way to do this
@@ -42,7 +42,7 @@ function bus.new(vm, c, aligned)
 	function b.insertBoard(page, board, ...)
 		log("[ebus] inserting board "..board.." in branch "..tostring(page))
 
-		local board = require("limn/ebus/"..board.."/board").new(vm, c, page, 0x20 + page, ...)
+		local board = require("limn/ebus/"..board.."/board").new(vm, c, page, 0x10 + page, ...)
 
 		b.mapArea(page, board.handler)
 

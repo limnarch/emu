@@ -130,6 +130,7 @@ function cpu.new(vm, c)
 		r[43] = ptr
 		exception(9)
 	end
+	local unaligned = p.unaligned
 
 	function p.fillState(s)
 		if getBit(s, 31) == 1 then
@@ -2189,12 +2190,12 @@ function cpu.new(vm, c)
 			for i = 23, 45 do
 				Slab.Text(string.format("%7s %08x", p.regmnem[i+1], r[i]))
 
-				--if (i == 31) or (i == 38) or (i == 37) or (i == 30) then
-				--	local sym,off = p.loffsym(r[i])
-				--	if sym then
-				--		Slab.Textf(gsymstr(sym,off))
-				--	end
-				--end
+				if (i == 31) or (i == 38) or (i == 37) or (i == 30) then
+					local sym,off = p.loffsym(r[i])
+					if sym then
+						Slab.Textf(gsymstr(sym,off))
+					end
+				end
 			end
 
 			Slab.EndLayout()

@@ -234,7 +234,7 @@ function dmacon.new(vm, c, branch, intn, memsize)
 				--busyw = vm.registerTimed(registers[4]*0.0000002, function ()
 					r = op()
 					if getBit(registers[6], 1) == 1 then
-						c.int(intn)
+						c.int(0x2)
 					end
 					registers[6] = setBit(registers[6], 0, 0)
 				--end)
