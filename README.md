@@ -18,6 +18,6 @@ Then, type `./graphical.sh` in the project directory.
 
 ## Control
 
-Striking the right CTRL key will switch the display between the video card and the serial ports.
+Striking the right ALT key will switch the display between the video card and the serial ports.
 
 Striking F12 will uncapture the mouse if it's captured. If the mouse isn't captured, F12 will enable a control mode UI that can be escaped by striking ESC.

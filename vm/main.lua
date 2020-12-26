@@ -334,7 +334,7 @@ function love.keypressed(key, t, isrepeat)
 		Slab.enabled = false
 	elseif controlui then
 
-	elseif key == "rctrl" then
+	elseif key == "ralt" then
 		local old = vm.bigscreen[selectedbig]
 
 		if selectedbig >= #vm.bigscreen then
