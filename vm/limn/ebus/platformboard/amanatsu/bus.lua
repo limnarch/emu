@@ -133,6 +133,7 @@ function pbus.new(vm, c, b)
 		for i = 1, 15 do
 			if dev[i] then
 				dev[i].reset()
+				dev[i].intn = nil
 			end
 		end
 	end
