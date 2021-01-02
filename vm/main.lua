@@ -32,6 +32,8 @@ vm.cb.update = {}
 vm.cb.draw = {}
 vm.cb.quit = {}
 
+vm.clockticks = 0
+
 local controlui = false
 
 local timed = false
@@ -201,11 +203,12 @@ function love.update(dt)
 
 	if (ct > 1) then
 		if dbmsg then
-			print(vm.hz, cycles, timesran, vm.computer.cpu.timerticks - lticks)
+			print(vm.hz, cycles, timesran, vm.computer.cpu.timerticks - lticks, vm.clockticks)
 			print("used "..tostring(usedt * 100).."% of time")
 			lticks = vm.computer.cpu.timerticks
 		end
 
+		vm.clockticks = 0
 		cycles = 0
 		ct = ct - 1
 		usedt = 0

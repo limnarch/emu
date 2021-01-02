@@ -10,6 +10,8 @@ function cdev.new(vm, c, bus)
 	cl.msr = 0
 	cl.tc = 0
 
+	local due = 0
+
 	local int = c.int
 
 	local epoch = os.time(os.date("!*t"))
@@ -20,10 +22,23 @@ function cdev.new(vm, c, bus)
 			cl.tc = cl.tc + dt
 			while cl.tc > cl.msr do
 				cl.tc = cl.tc - cl.msr
-				int(0x1)
+				due = due + 1
+			end
+
+			if due > 0 then
+				int(0x1, cl.inta)
 			end
 		end
 	end)
+
+	function cl.inta()
+		due = due - 1
+		if due > 0 then
+			int(0x1, cl.inta)
+		end
+
+		vm.clockticks = vm.clockticks + 1
+	end
 
 	local portA = 0
 

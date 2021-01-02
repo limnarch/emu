@@ -7,9 +7,11 @@ function ic.new(vm, c)
 
 	local cnr = ffi.new("uint32_t[5]")
 
+	local tinta = {}
+
 	cn.interrupting = false
 
-	function cn.int(src)
+	function cn.int(src, inta)
 		if (src > 63) or (src == 0) then
 			error("bad interrupt source")
 		end
@@ -26,6 +28,10 @@ function ic.new(vm, c)
 
 		if band(rshift(cnr[rm], srcbmpoff), 1) == 0 then
 			cn.interrupting = true
+		end
+
+		if inta then
+			tinta[src] = inta
 		end
 	end
 	c.int = cn.int -- set computer's interrupt function to mine
@@ -73,6 +79,13 @@ function ic.new(vm, c)
 
 				if (band(bnot(cnr[0]), cnr[2]) == 0) and (band(bnot(cnr[1]), cnr[3]) == 0) then
 					cn.interrupting = false
+				end
+
+				local af = tinta[v]
+
+				if af then
+					tinta[v] = nil
+					af()
 				end
 			end
 		elseif r < 4 then -- masks and interrupt sources
