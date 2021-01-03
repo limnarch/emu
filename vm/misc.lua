@@ -224,3 +224,50 @@ function cast(struct, tab, offset)
 
     return s
 end
+
+-- implementing my own version of this function because lua's is broken.
+
+local secspermin = 60
+local secsperhour = secspermin*60
+local secsperday = secsperhour*24
+local secsperyear = secsperday*365
+local secsperleapyear = secsperday+secsperyear
+
+local days_per_mth = {
+    31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+}
+
+function mktime(time)
+    local y = time.year - 1970
+
+    if y < 0 then
+        error("date before 1970")
+    end
+
+    local s = (secsperyear * y) + ( ((y+1)/4) * secsperday)
+
+    if ((y+2)%4 ~= 0) then
+        days_per_mth[2] = 28
+    else
+        days_per_mth[2] = 29
+    end
+
+    for i = 1, time.month-1 do
+        s = s + (secsperday * days_per_mth[i])
+    end
+
+    s = s + ((time.day - 1) * secsperday)
+    s = s + (time.hour * secsperhour)
+    s = s + (time.min * secspermin)
+    s = s + time.sec
+
+    if time.isdst then
+        s = s - secsperhour
+    end
+
+    return s
+end
+
+function getepoch()
+    return mktime(os.date("!*t"))
+end

@@ -14,7 +14,7 @@ function cdev.new(vm, c, bus)
 
 	local int = c.int
 
-	local epoch = os.time(os.date("!*t"))
+	local epoch = getepoch()
 	local et = love.timer.getTime()
 
 	vm.registerCallback("update", function (dt)
