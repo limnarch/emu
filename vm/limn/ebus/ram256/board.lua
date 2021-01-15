@@ -9,7 +9,11 @@ function ram256.new(vm, c, branch, intn, memsize)
 	local memsize = ram.memsize
 
 	ram.physmem = ffi.new("uint32_t[?]", memsize/4)
-	local physmem = ram.physmem
+	local physmem32 = ram.physmem
+
+	local physmem16 = ffi.cast("uint16_t*", physmem32)
+
+	local physmem8 = ffi.cast("uint8_t*", physmem32)
 
 	--for i = 0, memsize-1 do
 	--	physmem[i] = math.floor(math.random()*256)
@@ -23,56 +27,22 @@ function ram256.new(vm, c, branch, intn, memsize)
 		end
 
 		if s == 0 then -- byte
-			local off = band(offset, 0x3)
-
 			if t == 0 then
-				if off == 0 then
-					return band(physmem[rshift(offset, 2)], 0x000000FF)
-				elseif off == 1 then
-					return band(rshift(physmem[rshift(offset, 2)], 8), 0x0000FF)
-				elseif off == 2 then
-					return band(rshift(physmem[rshift(offset, 2)], 16), 0x00FF)
-				elseif off == 3 then
-					return band(rshift(physmem[rshift(offset, 2)], 24), 0xFF)
-				end
+				return physmem8[offset]
 			else
-				local cw = rshift(offset, 2)
-				local word = physmem[cw]
-
-				local off = band(offset, 0x3)
-
-				if off == 0 then
-					physmem[cw] = band(word, 0xFFFFFF00) + band(v, 0xFF)
-				elseif off == 1 then 
-					physmem[cw] = band(word, 0xFFFF00FF) + lshift(band(v, 0xFF), 8)
-				elseif off == 2 then
-					physmem[cw] = band(word, 0xFF00FFFF) + lshift(band(v, 0xFF), 16)
-				elseif off == 3 then
-					physmem[cw] = band(word, 0x00FFFFFF) + lshift(band(v, 0xFF), 24)
-				end
+				physmem8[offset] = v
 			end
 		elseif s == 1 then -- int
 			if t == 0 then
-				if band(offset, 0x3) == 0 then
-					return band(physmem[rshift(offset, 2)], 0xFFFF)
-				else
-					return rshift(physmem[rshift(offset, 2)], 16)
-				end
+				return physmem16[offset/2]
 			else
-				local cw = rshift(offset, 2)
-				local word = physmem[cw]
-
-				if band(offset, 0x3) == 0 then
-					physmem[cw] = band(word, 0xFFFF0000) + band(v, 0xFFFF)
-				else
-					physmem[cw] = band(word, 0x0000FFFF) + lshift(v, 16)
-				end
+				physmem16[offset/2] = v
 			end
 		elseif s == 2 then -- long
 			if t == 0 then
-				return physmem[rshift(offset, 2)]
+				return physmem32[offset/4]
 			else
-				physmem[rshift(offset, 2)] = v
+				physmem32[offset/4] = v
 			end
 		end
 
