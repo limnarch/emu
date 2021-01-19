@@ -26,6 +26,10 @@ function cdev.new(vm, c, bus)
 			end
 
 			if due > 0 then
+				if due > 10 then
+					due = 10
+				end
+
 				int(0x1, cl.inta)
 			end
 		end
