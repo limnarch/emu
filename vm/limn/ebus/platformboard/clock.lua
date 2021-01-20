@@ -27,7 +27,6 @@ function cdev.new(vm, c, bus)
 
 			if due > 0 then
 				if due > 16 then
-					print(due)
 					due = 16
 				end
 
