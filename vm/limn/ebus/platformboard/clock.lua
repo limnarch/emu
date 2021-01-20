@@ -26,8 +26,9 @@ function cdev.new(vm, c, bus)
 			end
 
 			if due > 0 then
-				if due > 10 then
-					due = 10
+				if due > 16 then
+					print(due)
+					due = 16
 				end
 
 				int(0x1, cl.inta)
