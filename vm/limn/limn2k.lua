@@ -89,15 +89,18 @@ function cpu.new(vm, c)
 			error("double exception, shouldnt ever happen")
 		end
 
-		--if (n ~= 5) and (n ~= 1) and (n ~= 3) and (n ~= 2) and (n ~= 6) then -- fault, do some debug info
-		--	p.lastfaultaddr = r[31]
+		-- if (n ~= 5) and (n ~= 1) and (n ~= 3) and (n ~= 2) and (n ~= 6) then -- fault, do some debug info
+		-- 	p.lastfaultaddr = r[31]
 
-		--	p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
+		-- 	p.lastfaultsym, p.lastfaultoff = p.loffsym(r[31])
 
-		--	print(gsymstr(p.lastfaultsym, p.lastfaultoff))
+		-- 	print(gsymstr(p.lastfaultsym, p.lastfaultoff))
 
-		--	running = false
-		--end
+		-- 	running = false
+
+		-- 	print(n)
+		-- 	print(string.format("%X", r[43]))
+		-- end
 
 		--p.dumpcalls(20)
 

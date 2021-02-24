@@ -52,8 +52,7 @@ local symbol_s = struct({
 local fixup_s = struct({
 	{4, "symbolIndex"},
 	{4, "offset"},
-	{4, "size"},
-	{4, "shift"},
+	{4, "type"},
 })
 
 local uint32_s = struct {
@@ -106,6 +105,7 @@ function loff.new(filename)
 	local LOFF2MAGIC = 0x4C4F4632
 	local LOFF3MAGIC = 0x4C4F4633
 	local LOFF4MAGIC = 0x4C4F4634
+	local LOFF5MAGIC = 0x4C4F4635
 
 	function iloff:load()
 		local file = io.open(self.path, "rb")
@@ -129,13 +129,13 @@ function loff.new(filename)
 
 		local magic = hdr.gv("magic")
 
-		if (magic == LOFF1MAGIC) or (magic == LOFF2MAGIC) or (magic == LOFF3MAGIC) then
+		if (magic == LOFF1MAGIC) or (magic == LOFF2MAGIC) or (magic == LOFF3MAGIC) or (magic == LOFF4MAGIC) then
 			print(string.format("objtool: '%s' is in an older LOFF format and needs to be rebuilt", self.path))
 			return false
 		elseif (magic == AIXOMAGIC) then
 			print(string.format("objtool: '%s' is in legacy AIXO format and needs to be rebuilt", self.path))
 			return false
-		elseif (magic == LOFF4MAGIC) then
+		elseif (magic == LOFF5MAGIC) then
 			-- goood
 		else
 			print(string.format("objtool: '%s' isn't a LOFF format image", self.path))
@@ -304,9 +304,7 @@ function loff.new(filename)
 
 						f.offset = fent.gv("offset")
 
-						f.size = fent.gv("size")
-
-						f.shift = fent.gv("shift")
+						f.type = fent.gv("type")
 
 						f.file = self.path
 					end
