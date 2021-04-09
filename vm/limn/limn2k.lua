@@ -234,7 +234,7 @@ function cpu.new(vm, c)
 	end
 
 	function p.fetchByte(ptr)
-		if (ptr < 1024) or (ptr >= 0xFFFFFC00) then
+		if (ptr < 0x1000) or (ptr >= 0xFFFFF000) then
 			pagefault(ptr)
 			return false
 		end
@@ -250,7 +250,7 @@ function cpu.new(vm, c)
 	local fB = p.fetchByte
 
 	function p.fetchInt(ptr)
-		if (ptr < 1024) or (ptr >= 0xFFFFFC00) then
+		if (ptr < 0x1000) or (ptr >= 0xFFFFF000) then
 			pagefault(ptr)
 			return false
 		end
@@ -271,7 +271,7 @@ function cpu.new(vm, c)
 	local fI = p.fetchInt
 
 	function p.fetchLong(ptr)
-		if (ptr < 1024) or (ptr >= 0xFFFFFC00) then
+		if (ptr < 0x1000) or (ptr >= 0xFFFFF000) then
 			pagefault(ptr)
 			return false
 		end
@@ -292,7 +292,7 @@ function cpu.new(vm, c)
 	local fL = p.fetchLong
 
 	function p.storeByte(ptr, v)
-		if (ptr < 1024) or (ptr >= 0xFFFFFC00) then
+		if (ptr < 0x1000) or (ptr >= 0xFFFFF000) then
 			pagefault(ptr)
 			return false
 		end
@@ -308,7 +308,7 @@ function cpu.new(vm, c)
 	local sB = p.storeByte
 
 	function p.storeInt(ptr, v)
-		if (ptr < 1024) or (ptr >= 0xFFFFFC00) then
+		if (ptr < 0x1000) or (ptr >= 0xFFFFF000) then
 			pagefault(ptr)
 			return false
 		end
@@ -329,7 +329,7 @@ function cpu.new(vm, c)
 	local sI = p.storeInt
 
 	function p.storeLong(ptr, v)
-		if (ptr < 1024) or (ptr >= 0xFFFFFC00) then
+		if (ptr < 0x1000) or (ptr >= 0xFFFFF000) then
 			pagefault(ptr)
 			return false
 		end
