@@ -14,8 +14,6 @@ Modify the `./love.sh` shell script to point to your Love2D 11.0 executable.
 
 Then, type `./graphical.sh` in the project directory.
 
-![Running the Antecedent 3.x boot firmware](https://i.imgur.com/RkW6RG8.png)
-
 ## Control
 
 Striking the right ALT key will switch the display between the video card and the serial ports.
