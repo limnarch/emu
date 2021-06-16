@@ -109,7 +109,7 @@ function love.load(arg)
 		window.init()
 	end
 
-	vm.computer = require("computer").new(vm, 4*1024*1024) -- new computer with 4mb of mem
+	vm.computer = require("computer").new(vm, 4*1024*1024) -- new computer with 4mb of RAM
 
 	local i = 1
 	while true do
