@@ -5,7 +5,8 @@
 -- 0000800-0000FFF: platformboard info
 -- 0001000-0010FFF: NVRAM
 -- 0020000-0021000: dks block buffer
--- 0030000-0x300FF: LSIC registers
+-- 0030000-00300FF: LSIC registers
+-- 0800000-0800003: reset
 -- 7FE0000-FFFFFFF: boot ROM
 
 local pboard = {}
@@ -95,6 +96,14 @@ function pboard.new(vm, c, branch, intn)
 			return satsumah(s, t, offset - 0x20000, v)
 		elseif (offset >= 0x30000) and (offset < 0x30100) then -- LSIC registers
 			return lsich(s, t, offset - 0x30000, v)
+		elseif offset == 0x800000 then -- reset
+			if (v == 0xAABBCCDD) and (t == 1) then
+				c.bus.reset()
+
+				return true
+			else
+				return false
+			end
 		else
 			return false
 		end

@@ -244,7 +244,7 @@ function cpu.new(vm, c)
 		local v = translate(ptr, 1)
 
 		if v then
-			return TfB(v)
+			return TfB(translate(ptr, 1))
 		end
 	end
 	local fB = p.fetchByte

@@ -11,7 +11,7 @@ function love.conf(t)
 		"loopunroll=128",
 		"maxmcode=16384",
 		"tryside=128",
-		"hotexit=128",
+		"hotexit=16",
 		"hotloop=32")
 	-- t.window.borderless = true
 end

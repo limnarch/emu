@@ -50,9 +50,7 @@ function ram256.new(vm, c, branch, intn, memsize)
 	end
 	local rhandler = ram.handler
 
-	function ram.reset()
-		-- nothing
-	end
+	function ram.reset() end
 
 	c.bus.mapArea(branch + 1, function (s, t, offset, v)
 		return rhandler(s, t, offset + 128*1024*1024, v)
@@ -60,7 +58,7 @@ function ram256.new(vm, c, branch, intn, memsize)
 
 	-- each slot fits a stick with a maximum capacity of 256mb/8 slots for 32mb
 	-- in a real system, slots would be mapped at regular offsets from the start of the ram256 area
-	-- but here we try to keep it contiguous for simplicity
+	-- but here we try to keep it contiguous
 
 	local slots = {}
 

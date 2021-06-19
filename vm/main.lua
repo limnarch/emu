@@ -109,7 +109,7 @@ function love.load(arg)
 		window.init()
 	end
 
-	vm.computer = require("computer").new(vm, 4*1024*1024) -- new computer with 4mb of RAM
+	vm.computer = require("computer").new(vm, 4*1024*1024) -- new computer with 4mb of mem
 
 	local i = 1
 	while true do
@@ -187,8 +187,6 @@ local usedt = 0
 
 local timesran = 0
 
-local lticks = 0
-
 local err = 0
 
 local alert = {
@@ -203,9 +201,8 @@ function love.update(dt)
 
 	if (ct > 1) then
 		if dbmsg then
-			print(vm.hz, cycles, timesran, vm.computer.cpu.timerticks - lticks, vm.clockticks)
+			print(vm.hz, cycles, timesran, vm.clockticks)
 			print("used "..tostring(usedt * 100).."% of time")
-			lticks = vm.computer.cpu.timerticks
 		end
 
 		vm.clockticks = 0

@@ -1,17 +1,6 @@
 local loff = {}
 
-loff.archinfo = {}
-local archinfo = loff.archinfo
-
-archinfo[1] = {}
-archinfo[1].name = "limn1k"
-archinfo[1].align = 1
-
-archinfo[2] = {}
-archinfo[2].name = "limn2k"
-archinfo[2].align = 4
-
-local loffheader_s = struct({
+local loffheader_s = struct {
 	{4, "magic"},
 	{4, "symbolTableOffset"},
 	{4, "symbolCount"},
@@ -22,15 +11,20 @@ local loffheader_s = struct({
 	{4, "stripped"},
 	{4, "importTableOffset"},
 	{4, "importCount"},
-	{20, "reserved"},
+	{4, "timestamp"},
+	{4, "fragment"},
+	{12, "reserved2"},
 	{4, "textHeaderOffset"},
 	{4, "dataHeaderOffset"},
 	{4, "bssHeaderOffset"},
-})
+}
 
 local import_s = struct({
 	{4, "name"},
-	{16, "reserved"},
+	{4, "expectedText"},
+	{4, "expectedData"},
+	{4, "expectedBSS"},
+	{4, "timestamp"},
 })
 
 local sectionheader_s = struct({
@@ -59,10 +53,96 @@ local uint32_s = struct {
 	{4, "value"}
 }
 
-function loff.new(filename)
+local RELOC_LIMN2K_16 = 2
+local RELOC_LIMN2K_24 = 3
+local RELOC_LIMN2K_32 = 4
+local RELOC_LIMN2K_LA = 5
+
+local function doFixupLimn2k(tab, off, nval, rtype)
+	local old = gv32(tab, off)
+	local new = old
+
+	if rtype == RELOC_LIMN2K_16 then
+		new = bor(band(old, 0xFFFF), lshift(band(rshift(nval, 2), 0xFFFF), 16))
+	elseif rtype == RELOC_LIMN2K_24 then
+		new = bor(band(old, 0xFF), lshift(band(rshift(nval, 2), 0xFFFFFF), 8))
+	elseif rtype == RELOC_LIMN2K_32 then
+		new = nval
+	elseif rtype == RELOC_LIMN2K_LA then
+		local old2 = gv32(tab, off + 4)
+
+		new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
+
+		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+
+		sv32(tab, off + 4, new2)
+	else
+		error("unknown relocation type "..rtype)
+	end
+
+	sv32(tab, off, new)
+end
+
+local RELOC_LIMN2500_LONG = 1
+local RELOC_LIMN2500_ABSJ = 2
+local RELOC_LIMN2500_LA   = 3
+
+local function doFixupLimn2500(tab, off, nval, rtype)
+	local old = gv32(tab, off)
+	local new = old
+
+	if rtype == RELOC_LIMN2500_ABSJ then
+		new = bor(band(old, 0x7), lshift(band(rshift(nval, 2), 0x1FFFFFFF), 3))
+	elseif rtype == RELOC_LIMN2500_LONG then
+		new = nval
+	elseif rtype == RELOC_LIMN2500_LA then
+		local old2 = gv32(tab, off + 4)
+
+		new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
+
+		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+
+		sv32(tab, off + 4, new2)
+	else
+		error("unknown relocation type "..rtype)
+	end
+
+	sv32(tab, off, new)
+end
+
+loff.archinfo = {}
+local archinfo = loff.archinfo
+
+archinfo[1] = {}
+archinfo[1].name = "limn1k"
+archinfo[1].align = 1
+
+archinfo[2] = {}
+archinfo[2].name = "limn2k"
+archinfo[2].align = 4
+archinfo[2].fixup = doFixupLimn2k
+
+archinfo[3] = {}
+archinfo[3].name = "riscv32"
+archinfo[3].align = 4
+
+archinfo[4] = {}
+archinfo[4].name = "limn2500"
+archinfo[4].align = 4
+archinfo[4].fixup = doFixupLimn2500
+
+function loff.new(filename, libname, fragment)
 	local iloff = {}
 
+	if fragment then
+		iloff.fragment = 1
+	else
+		iloff.fragment = 0
+	end
+
 	iloff.path = filename
+
+	-- iloff.libname = libname or getfilename(filename)
 
 	iloff.bin = {}
 
@@ -81,6 +161,10 @@ function loff.new(filename)
 	iloff.specials = {}
 
 	iloff.imports = {}
+
+	iloff.isym = {}
+
+	local doFixup
 
 	for i = 1, 3 do
 		iloff.sections[i] = {}
@@ -106,6 +190,22 @@ function loff.new(filename)
 	local LOFF3MAGIC = 0x4C4F4633
 	local LOFF4MAGIC = 0x4C4F4634
 	local LOFF5MAGIC = 0x4C4F4635
+
+	local sortedsym
+
+	local function sortsyms(s1,s2)
+		local s1t = iloff.sections[s1.section]
+		local s2t = iloff.sections[s2.section]
+
+		if not s1t then return false end
+		if not s2t then return true end
+
+		return (s1.value + s1t.linkedAddress) < (s2.value + s2t.linkedAddress)
+	end
+
+	function iloff:iSymSort()
+		table.sort(self.isym, sortsyms)
+	end
 
 	function iloff:load()
 		local file = io.open(self.path, "rb")
@@ -136,7 +236,7 @@ function loff.new(filename)
 			print(string.format("objtool: '%s' is in legacy AIXO format and needs to be rebuilt", self.path))
 			return false
 		elseif (magic == LOFF5MAGIC) then
-			-- goood
+			-- goood........
 		else
 			print(string.format("objtool: '%s' isn't a LOFF format image", self.path))
 			return false
@@ -146,7 +246,11 @@ function loff.new(filename)
 
 		self.archinfo = archinfo[self.codeType]
 
+		doFixup = self.archinfo.fixup
+
 		self.localSymNames = false
+
+		self.timestamp = self.header.gv("timestamp")
 
 		local stripped = self.header.gv("stripped")
 
@@ -155,6 +259,8 @@ function loff.new(filename)
 		else
 			self.linkable = true
 		end
+
+		self.fragment = self.header.gv("fragment")
 
 		local function getString(offset)
 			local off = self.header.gv("stringTableOffset") + offset
@@ -180,15 +286,20 @@ function loff.new(filename)
 
 			local import = {}
 
-			import.name = imp.gs("name")
+			import.name = getString(imp.gv("name"))
 
-			self.imports[i-1] = import
+			import.expectedText = imp.gv("expectedText")
+			import.expectedData = imp.gv("expectedData")
+			import.expectedBSS = imp.gv("expectedBSS")
+			import.timestamp = imp.gv("timestamp")
+
+			self.imports[i] = import
+
+			ptr = ptr + import_s.size()
 		end
 
 		local symcount = hdr.gv("symbolCount")
 		ptr = hdr.gv("symbolTableOffset")
-
-		self.isym = {}
 
 		for i = 1, symcount do
 			local sym = cast(symbol_s, self.bin, ptr)
@@ -240,7 +351,7 @@ function loff.new(filename)
 
 			if symt.symtype == 3 then
 				if symt.importindex ~= 0 then
-					symt.import = self.imports[symt.importindex-1]
+					symt.import = self.imports[symt.importindex]
 
 					if not symt.import then
 						print(string.format("objtool: '%s': non-existent import %d", self.path, symt.importindex))
@@ -297,8 +408,8 @@ function loff.new(filename)
 					for i = 0, fixupcount-1 do
 						local fent = cast(fixup_s, self.bin, fixupoff + (i * fixup_s.size()))
 
-						s.fixups[#s.fixups + 1] = {}
-						local f = s.fixups[#s.fixups]
+						local f = {}
+						s.fixups[#s.fixups + 1] = f
 
 						f.symbol = self.symbols[fent.gv("symbolIndex")]
 
@@ -312,55 +423,10 @@ function loff.new(filename)
 			end
 		end
 
-		function self:relocTo(section, address, relative)
-			if not self.linkable then
-				print(string.format("objtool: '%s' cannot be moved", self.path))
-				return false
-			end
-
-			if self.archinfo and (address % self.archinfo.align ~= 0) then
-				print(string.format("objtool: %s requires section addresses to be aligned to a boundary of %d bytes", self.archinfo.name, self.archinfo.align))
-				return false
-			end
-
-			local s = self.sections[section]
-
-			s.linkedAddress = address
-
-			for i = 1, 2 do
-				local s2 = self.sections[i]
-
-				for k,v in ipairs(s2.fixups) do
-					local sym = v.symbol
-
-					if sym and (sym.section == section) then
-						if v.size <= 8 then
-							local type_s = struct({{v.size, "value"}})
-							local addrs = cast(type_s, s2.contents, v.offset)
-
-							if sym.symtype == 4 then
-								if sym.value == 1 then
-									addrs.sv("value", rshift(s.linkedAddress, v.shift))
-								elseif sym.value == 2 then
-									addrs.sv("value", rshift(s.size, v.shift))
-								elseif sym.value == 3 then
-									addrs.sv("value", rshift(s.linkedAddress + s.size, v.shift))
-								end
-							else
-								addrs.sv("value", rshift(sym.value + s.linkedAddress, v.shift))
-							end
-						end
-					end
-				end
-			end
-
-			return true
-		end
-
 		function self:relocInFile(section, offset) -- blindly assumes linkedAddress = 0, caller check
-			if offset ~= 0 then
-				self:relocTo(section, offset)
+			-- print("reloc", section, offset)
 
+			if offset ~= 0 then
 				for i = 0, #self.symbols do
 					local sym = self.symbols[i]
 
@@ -429,26 +495,7 @@ function loff.new(filename)
 			return true
 		end
 
-		local sortedsym
-
-		local function sortsyms(s1,s2)
-			if s1.section == 0 then return false end
-			if s2.section == 0 then return false end
-
-			return (s1.value + s1.sectiont.linkedAddress) < (s2.value + s2.sectiont.linkedAddress)
-		end
-
-		function self:iSymSort()
-			if not sortedsym then
-				table.sort(self.isym, sortsyms)
-
-				sortedsym = true
-			end
-		end
-
 		function self:getSym(address)
-			self:iSymSort()
-
 			for i = 1, 3 do
 				local s = self.sections[i]
 
@@ -456,7 +503,7 @@ function loff.new(filename)
 					local thesym
 
 					for k,sym in ipairs(self.isym) do
-						if (sym.section == i) and (sym.symtype == 1) then
+						if (sym.section == i) and (sym.symtype ~= 4) then
 							if address >= (sym.value + s.linkedAddress) then
 								thesym = sym
 							elseif address < (sym.value + s.linkedAddress) then
@@ -537,8 +584,10 @@ function loff.new(filename)
 		if self.linkable then
 			local sp = {}
 
-			for i = 0, #self.symbols do
-				local sym = self.symbols[i]
+			self:iSymSort()
+
+			for i = 1, #self.isym do
+				local sym = self.isym[i]
 
 				if sym and (not sym.resolved) then
 					if sym.symtype == 4 then
@@ -550,6 +599,7 @@ function loff.new(filename)
 						end
 					else
 						sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value, sym.importindex)
+						--print(sym.name)
 					end
 				end
 			end
@@ -560,44 +610,49 @@ function loff.new(filename)
 				es = es.resolved
 			end
 
-			es.index = addSymbol(es.name, es.section, es.symtype, es.value)
+			es.index = addSymbol(es.name, es.section, es.symtype, es.value, es.importindex)
 		end
 
 		local imptab = ""
 		local imptabindex = 0
 
-		local function addImport(name)
+		local function addImport(name, expectedText, expectedData, expectedBSS, timestamp)
 			local nameoff = addString(name)
 
 			local u1, u2, u3, u4 = splitInt32(nameoff)
 			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-			for i = 0, 15 do -- reserved
-				imptab = imptab .. string.char(0)
-			end
+			u1, u2, u3, u4 = splitInt32(expectedText)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			u1, u2, u3, u4 = splitInt32(expectedData)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			u1, u2, u3, u4 = splitInt32(expectedBSS)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			u1, u2, u3, u4 = splitInt32(timestamp)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 			imptabindex = imptabindex + 1
 		end
 
-		for i = 0, #self.imports do
+		for i = 1, #self.imports do
 			local imp = self.imports[i]
 
 			if imp then
-				addImport(imp.name)
+				addImport(imp.name, imp.expectedText, imp.expectedData, imp.expectedBSS, imp.timestamp)
 			end
 		end
 
-		local function addFixup(section, symindex, offset, size, shift)
+		local function addFixup(section, symindex, offset, rtype)
 			local u1, u2, u3, u4 = splitInt32(symindex)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 			u1, u2, u3, u4 = splitInt32(offset)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-			u1, u2, u3, u4 = splitInt32(size)
-			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-
-			u1, u2, u3, u4 = splitInt32(shift)
+			u1, u2, u3, u4 = splitInt32(rtype)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		end
 
@@ -616,7 +671,7 @@ function loff.new(filename)
 						sindex = v.symbol.index
 					end
 
-					addFixup(s, sindex, v.offset, v.size, v.shift)
+					addFixup(s, sindex, v.offset, v.type)
 
 					s.fixupcount = s.fixupcount + 1
 				end
@@ -631,7 +686,7 @@ function loff.new(filename)
 		-- make header
 		local size = 72
 
-		local header = "4FOL"
+		local header = "5FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)
@@ -687,9 +742,25 @@ function loff.new(filename)
 		u1, u2, u3, u4 = splitInt32(imptabindex)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
+		-- timestamp
+		u1, u2, u3, u4 = splitInt32(self.timestamp)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		-- fragment
+		u1, u2, u3, u4 = splitInt32(self.fragment)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
 		-- reserved
-		for i = 0, 19 do
+		for i = 0, 11 do
 			header = header .. string.char(0)
+		end
+
+		for i = 1, 2 do
+			local s = self.sections[i]
+
+			s.fixupoffset = size
+
+			size = size + (s.fixupcount * fixup_s.size())
 		end
 
 		local ts = self.sections[1]
@@ -714,9 +785,8 @@ function loff.new(filename)
 		local textHeader = ""
 
 		-- fixupTableOffset
-		u1, u2, u3, u4 = splitInt32(size)
+		u1, u2, u3, u4 = splitInt32(ts.fixupoffset)
 		textHeader = textHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		size = size + (ts.fixupcount * fixup_s.size())
 
 		-- fixupCount
 		u1, u2, u3, u4 = splitInt32(ts.fixupcount)
@@ -738,9 +808,8 @@ function loff.new(filename)
 		local dataHeader = ""
 
 		-- fixupTableOffset
-		u1, u2, u3, u4 = splitInt32(size)
+		u1, u2, u3, u4 = splitInt32(ds.fixupoffset)
 		dataHeader = dataHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		size = size + (ds.fixupcount * fixup_s.size())
 
 		-- fixupCount
 		u1, u2, u3, u4 = splitInt32(ds.fixupcount)
@@ -778,12 +847,18 @@ function loff.new(filename)
 		u1, u2, u3, u4 = splitInt32(bs.linkedAddress)
 		bssHeader = bssHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-		file:write(header .. symtab .. strtab .. imptab .. textHeader .. dataHeader .. bssHeader)
+		file:write(header .. symtab .. strtab .. imptab)
 
 		for i = 1, 2 do
 			local s = self.sections[i]
 
 			file:write(s.fixuptab)
+		end
+
+		file:write(textHeader .. dataHeader .. bssHeader)
+
+		for i = 1, 2 do
+			local s = self.sections[i]
 
 			for b = 0, s.size - 1 do
 				file:write(string.char(s.contents[b]))
@@ -822,18 +897,6 @@ function loff.new(filename)
 			local sym = v.symbol
 
 			if sym and sym.resolved and (sym.symtype ~= 4) then
-				if sym.resolved.section == section then
-					--print(string.format("resolving %s @ %X", sym.name, v.offset))
-
-					if v.size <= 8 then
-						local type_s = struct({{v.size, "value"}})
-						local addrs = cast(type_s, mysection.contents, v.offset)
-						addrs.sv("value", rshift(sym.resolved.value, v.shift))
-					else
-						--print("didnt resolve")
-					end
-				end
-
 				v.symbol = sym.resolved
 			end
 		end
@@ -841,10 +904,119 @@ function loff.new(filename)
 		return true
 	end
 
-	function iloff:link(with)
+	function iloff:import(with)
+		for i = 0, #self.imports do
+			if self.imports[i] then
+				if self.imports[i].name == with.libname then
+					return true
+				end
+			end
+		end
+
+		local import = {}
+
+		local impindex
+
+		import.name = with.libname
+		import.expectedText = with.sections[1].linkedAddress
+		import.expectedData = with.sections[2].linkedAddress
+		import.expectedBSS = with.sections[3].linkedAddress
+		import.timestamp = with.timestamp or 0
+
+		impindex = #self.imports + 1
+		self.imports[impindex] = import
+
+		for k,v in pairs(self.externs) do
+			local wsym = with.globals[k]
+
+			if wsym then
+				v.import = import
+				v.importindex = impindex
+				v.dq = wsym
+			end
+		end
+	end
+
+	function iloff:relocTo(section, address, relative)
+		if not self.linkable then
+			print(string.format("objtool: '%s' cannot be moved", self.path))
+			return false
+		end
+
+		if self.archinfo and (address % self.archinfo.align ~= 0) then
+			print(string.format("objtool: %s requires section addresses to be aligned to a boundary of %d bytes", self.archinfo.name, self.archinfo.align))
+			return false
+		end
+
+		local s = self.sections[section]
+
+		s.linkedAddress = address
+
+		for i = 1, 2 do
+			local s2 = self.sections[i]
+
+			for k,v in ipairs(s2.fixups) do
+				local sym = v.symbol
+
+				if sym.resolved then
+					sym = sym.resolved
+				end
+
+				if sym and (sym.section == section) then
+					local nval
+
+					if sym.symtype == 4 then
+						if sym.value == 1 then
+							nval = s.linkedAddress
+						elseif sym.value == 2 then
+							nval = s.size
+						elseif sym.value == 3 then
+							nval = s.linkedAddress + s.size
+						end
+					else
+						nval = sym.value + s.linkedAddress
+					end
+
+					-- print(string.format("%s %s $%x %d", v.symbol.name, v.file, v.offset, v.type))
+
+					doFixup(s2.contents, v.offset, nval, v.type)
+				end
+			end
+		end
+
+		return true
+	end
+
+	function iloff:relocate()
+		-- perform all fixups
+
+		for s = 1, 3 do
+			local section = self.sections[s]
+
+			if not self:relocTo(s, section.linkedAddress) then return false end
+		end
+
+		for s = 1, 3 do
+			local section = self.sections[s]
+
+			for k,v in ipairs(section.fixups) do
+				local sym = v.symbol
+
+				if sym and sym.dq and (sym.symtype ~= 4) then
+					doFixup(section.contents, v.offset, sym.dq.value+sym.dq.sectiont.linkedAddress, v.type)
+				end
+			end
+		end
+	end
+
+	function iloff:link(with, dynamic)
 		if not self.codeType then
 			self.codeType = with.codeType
+
+			doFixup = with.archinfo.fixup
 		end
+
+		-- print(self.path, with.path)
 
 		if (not with.linkable) then
 			print(string.format("objtool: '%s' cannot be linked", with.path))
@@ -855,83 +1027,88 @@ function loff.new(filename)
 			print(string.format("objtool: warning: linking 2 object files of differing code types, %d and %d\n  %s\n  %s", self.codeType, with.codeType, self.path, with.path))
 		end
 
-		if self.entrySymbol and with.entrySymbol then
-			print(string.format("objtool: conflicting entry symbols: '%s' and '%s'", self.entrySymbol.name, with.entrySymbol.name))
-			return false
-		elseif not self.entrySymbol then
-			self.entrySymbol = with.entrySymbol
-		end
+		-- unix time
+		self.timestamp = os.time(os.date("!*t"))
 
-		for k,v in pairs(with.externs) do
-			if self.externs[k] then
-				v.exclude = true
+		if not dynamic then
+			if self.entrySymbol and with.entrySymbol then
+				print(string.format("objtool: conflicting entry symbols: '%s' and '%s'", self.entrySymbol.name, with.entrySymbol.name))
+				return false
+			elseif not self.entrySymbol then
+				self.entrySymbol = with.entrySymbol
+			end
 
-				for i = 1, 2 do
-					for k2,v2 in ipairs(with.sections[i].fixups) do
-						if v2.symbol == v then
-							v2.symbol = self.externs[k]
+			for k,v in pairs(with.externs) do
+				if self.externs[k] then
+					v.exclude = true
+
+					for i = 1, 2 do
+						for k2,v2 in ipairs(with.sections[i].fixups) do
+							if v2.symbol == v then
+								v2.symbol = self.externs[k]
+							end
 						end
 					end
+				else
+					self.externs[k] = v
 				end
-			else
-				self.externs[k] = v
-			end
 
-			if self.globals[k] then
-				v.resolved = self.globals[k]
-				v.section = 0
-
-				self.externs[k] = nil
-			end
-		end
-
-		for k,v in pairs(with.globals) do
-			if self.globals[k] then
-				local ms = self.globals[k]
-				print(string.format("objtool: symbol conflict: '%s' is defined in both:\n %s\n %s", v.name, ms.file, v.file))
-				return false
-			else
-				self.globals[k] = v
-
-				if self.externs[k] then
-					local e = self.externs[k]
-
-					e.resolved = v
-					e.section = 0
+				if self.globals[k] then
+					v.resolved = self.globals[k]
+					v.section = 0
 
 					self.externs[k] = nil
 				end
 			end
-		end
 
-		for k,v in pairs(with.specials) do
-			with.specials[k].resolved = self.specials[k]
-		end
-
-		for i = 0, #with.symbols do
-			local sym = with.symbols[i]
-
-			if sym and (not sym.exclude) then
-				if not self.symbols[0] then
-					if sym.resolved then
-						self.symbols[0] = sym.resolved
-					else
-						self.symbols[0] = sym
-					end
+			for k,v in pairs(with.globals) do
+				if self.globals[k] then
+					local ms = self.globals[k]
+					print(string.format("objtool: symbol conflict: '%s' is defined in both:\n %s\n %s", v.name, ms.file, v.file))
+					return false
 				else
-					if sym.resolved then
-						self.symbols[#self.symbols + 1] = sym.resolved
-					else
-						self.symbols[#self.symbols + 1] = sym
+					self.globals[k] = v
+
+					if self.externs[k] then
+						local e = self.externs[k]
+
+						e.resolved = v
+						e.section = 0
+
+						self.externs[k] = nil
 					end
 				end
 			end
-		end
 
-		for i = 1, 3 do
-			if not self:mergeSection(with, i) then
-				return false
+			for k,v in pairs(with.specials) do
+				with.specials[k].resolved = self.specials[k]
 			end
+
+			for i = 0, #with.symbols do
+				local sym = with.symbols[i]
+
+				if sym and (not sym.exclude) and (not sym.resolved) then
+					if not self.symbols[0] then
+						self.symbols[0] = sym.resolved or sym
+					else
+						self.symbols[#self.symbols + 1] = sym.resolved or sym
+					end
+
+					--print(string.format("hi %d %s=%x", sym.symtype, sym.name, sym.value))
+
+					self.isym[#self.isym + 1] = sym.resolved or sym
+				end
+			end
+
+			for i = 1, 3 do
+				-- print(self.path, with.path, with.sections[i].name)
+
+				if not self:mergeSection(with, i) then
+					return false
+				end
+			end
+		else
+			self:import(with)
 		end
 
 		return true
