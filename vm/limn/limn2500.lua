@@ -50,6 +50,8 @@ function cpu.new(vm, c)
 	local Ilastvpn = nil
 	local Ilastvpnt = nil
 
+	local r_pc = ffi.new("uint32_t[1]") -- don't even ask why i have to do it like this
+
 	local function gsymstr(sym,off)
 		if not sym then return "" end
 
@@ -352,8 +354,6 @@ function cpu.new(vm, c)
 	local sL = p.storeLong
 
 	local intc
-
-	local r_pc = ffi.new("uint32_t[1]") -- don't even ask why i have to do it like this
 
 	function p.reset()
 		intc = c.intc
@@ -775,6 +775,10 @@ function cpu.new(vm, c)
 			return cr[3] -- r_pc = epc
 		end,
 		[10] = function(inst) -- fwc
+			--if reg[30] >= 0x80000000 then
+			--	running = false
+			--end
+
 			exception(3) -- firmware call
 		end,
 
