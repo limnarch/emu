@@ -12,7 +12,6 @@ function computer.new(vm, memsize)
 	c.cpu = require("limn/limn2500").new(vm, c)
 
 	c.bus.insertBoard(31, "platformboard") -- virtual board for chipset
-	c.bus.insertBoard(30, "dma") -- virtual board for DMA
 	c.bus.insertBoard(0, "ram256", memsize) -- virtual board for RAM
 
 	local icon = love.image.newImageData("limn/icon.png")

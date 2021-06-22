@@ -57,7 +57,7 @@ function pboard.new(vm, c, branch, intn)
 	pb.registers = ffi.new("uint32_t[32]")
 	local registers = pb.registers
 
-	registers[0] = 0x00020001 -- platform board version
+	registers[0] = 0x00030001 -- platform board version
 
 	local function pbh(s, t, offset, v) -- info space
 		if band(offset, 3) ~= 0 then -- must be aligned to 4 bytes
