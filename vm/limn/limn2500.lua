@@ -105,19 +105,19 @@ function cpu.new(vm, c)
 	local unaligned = p.unaligned
 
 	function p.fillState(s)
-		if getBit(s, 0) == 0 then
+		if band(s, 1) == 0 then
 			kmode = true
 		else
 			kmode = false
 		end
 
-		if getBit(s, 1) == 1 then
+		if band(s, 2) == 2 then
 			intmode = true
 		else
 			intmode = false
 		end
 
-		if getBit(s, 2) == 1 then
+		if band(s, 4) == 4 then
 			translating = true
 		else
 			translating = false
@@ -177,6 +177,10 @@ function cpu.new(vm, c)
 				local pde = TfL(pgtb + lshift(rshift(ptr,22),2))
 
 				if not pde then
+					return false
+				end
+
+				if pde == 0 then
 					return false
 				end
 
