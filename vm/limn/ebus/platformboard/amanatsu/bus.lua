@@ -1,7 +1,7 @@
 local pbus = {}
 
 -- implements amanatsu bus
--- port 0x30: device selection (0-255)
+-- port 0x30: device selection (0-15)
 --	0: special bus functions
 --	1+: devices
 -- port 0x31: MID

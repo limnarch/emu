@@ -467,7 +467,7 @@ function cpu.new(vm, c)
 				reg[rd] = 0
 			end
 		end,
-		[28] = function (addr, inst) -- addi
+		[28] = function (addr, inst) -- andi
 			local rd = band(rshift(inst, 6), 31)
 
 			if rd == 0 then return end
