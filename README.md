@@ -6,6 +6,8 @@ The long-term goal is to create a really neat (but useless) emulated desktop com
 
 Ships with a pre-built [boot ROM](https://github.com/limnarch/a3x) binary.
 
+Also see the less featured, but way faster, [C+SDL implementation](https://github.com/limnarch/limnemu).
+
 ## Running
 
 Install [Love2D](https://love2d.org/) 11.0 from their website, or using your favorite package manager.
