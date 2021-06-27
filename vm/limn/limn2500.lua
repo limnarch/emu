@@ -45,6 +45,7 @@ function cpu.new(vm, c)
 	local DlastASID = nil
 	local Dlastvpn = nil
 	local Dlastvpnt = nil
+	local DlastWritable = nil
 
 	local IlastASID = nil
 	local Ilastvpn = nil
@@ -143,6 +144,10 @@ function cpu.new(vm, c)
 			end
 		else
 			if (myasid == DlastASID) and (vpn == Dlastvpn) then
+				if (write and (not DlastWritable)) then
+					return false
+				end
+
 				return Dlastvpnt + off
 			end
 		end
@@ -225,6 +230,7 @@ function cpu.new(vm, c)
 			Dlastvpn = vpn
 			Dlastvpnt = ppnt
 			DlastASID = myasid
+			DlastWritable = (band(tlbe, 2) == 2)
 		end
 
 		if not kmode and (band(tlbe, 4) == 4) then -- kernel (K) bit set
