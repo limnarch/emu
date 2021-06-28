@@ -1,4 +1,4 @@
-# LIMNemu
+# LIMNemu (LuaJIT+Love2D)
 
 Emulates the LIMNstation fantasy computer, inspired by late 80s Unix workstations.
 
@@ -6,7 +6,7 @@ The long-term goal is to create a really neat (but useless) emulated desktop com
 
 Ships with a pre-built [boot ROM](https://github.com/limnarch/a3x) binary.
 
-Also see the less featured, but way faster, [C+SDL implementation](https://github.com/limnarch/limnemu).
+Also see the less featured, but way (way) faster, [C+SDL implementation](https://github.com/limnarch/limnemu).
 
 ## Running
 
